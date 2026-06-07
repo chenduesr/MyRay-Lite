@@ -24,6 +24,8 @@ This project does not include, reference, compile, or call v2rayN source code.
 Push a tag such as `v1.1.0` to trigger `.github/workflows/release.yml`.
 The workflow builds a self-contained Windows x64 zip and bundles the latest official Xray-core runtime.
 
+See `CHANGELOG.md` for release notes and feature changes.
+
 For a local portable build:
 
 ```powershell
