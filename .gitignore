@@ -1,0 +1,12 @@
+bin/
+obj/
+.vs/
+.dotnet_home/
+publish/
+*.user
+*.suo
+*.tmp
+src/**/bin/
+src/**/obj/
+bin/xray/*
+!bin/xray/README.md

@@ -1,0 +1,6 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/V2RayLite.App/V2RayLite.App.csproj" />
+    <Project Path="src/V2RayLite.Core/V2RayLite.Core.csproj" />
+  </Folder>
+</Solution>

@@ -1,0 +1,7 @@
+SPDX-License-Identifier: GPL-3.0-only
+
+This project tracks v2rayN source code as a Git submodule under `external/v2rayN`,
+which is licensed under GPL-3.0. Distribute V2Ray Lite under GPL-3.0-compatible
+terms.
+
+See `external/v2rayN/LICENSE` for the full GPL-3.0 license text.
