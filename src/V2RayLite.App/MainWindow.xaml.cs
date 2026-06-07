@@ -22,11 +22,12 @@ namespace V2RayLite.App;
 public partial class MainWindow : Window, INotifyPropertyChanged
 {
     private readonly AppPaths _paths = new();
+    private readonly AppLogService _log;
     private readonly SettingsStore _store;
     private readonly SubscriptionService _subscriptionService;
     private readonly XrayProcessService _xrayService;
     private readonly SystemProxyService _systemProxyService = new();
-    private readonly DelayTestService _delayTestService = new();
+    private readonly DelayTestService _delayTestService;
     private readonly XrayDownloadService _downloadService;
     private readonly ObservableCollection<ProxyNode> _nodes = [];
     private readonly WinForms.NotifyIcon _notifyIcon;
@@ -44,9 +45,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DataContext = this;
 
         var httpClient = new HttpClient();
+        var configBuilder = new XrayConfigBuilder();
+        _log = new AppLogService(_paths);
         _store = new SettingsStore(_paths);
         _subscriptionService = new SubscriptionService(httpClient, new SubscriptionParser(), _store);
-        _xrayService = new XrayProcessService(_paths, new XrayConfigBuilder());
+        _xrayService = new XrayProcessService(_paths, configBuilder, _log);
+        _delayTestService = new DelayTestService(_paths, configBuilder, _log);
         _downloadService = new XrayDownloadService(httpClient, _paths);
         _notifyIcon = CreateNotifyIcon();
 
@@ -57,6 +61,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ProxyNode> FilteredNodes { get; } = [];
+    public ObservableCollection<string> LogLines { get; } = [];
 
     public string CurrentPage
     {
@@ -67,6 +72,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _currentPage = value;
             Notify();
             NotifyNavigation();
+            if (string.Equals(value, "Logs", StringComparison.OrdinalIgnoreCase))
+            {
+                RefreshLogLines();
+            }
         }
     }
 
@@ -74,7 +83,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string SidebarStatus => _isProxyEnabled ? "已连接" : "未连接";
     public string ToggleProxyText => _isProxyEnabled ? "关闭代理" : "开启代理";
     public MediaBrush RuntimeStatusBrush => Brush(_isProxyEnabled ? "#18AE4D" : "#64748B");
-    public MediaBrush SidebarStatusBrush => Brush(_isProxyEnabled ? "#2BCB66" : "#2BCB66");
+    public MediaBrush SidebarStatusBrush => Brush(_isProxyEnabled ? "#2BCB66" : "#94A3B8");
     public string ActiveNodeName => ActiveNode?.Name ?? "未选择";
     public string ActiveNodeDelay => ActiveNode?.DisplayDelay ?? "—";
     public string ProxyModeText => _settings.ProxyMode switch
@@ -86,6 +95,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     };
     public int NodeCount => _nodes.Count;
     public bool HasNodes => FilteredNodes.Count > 0;
+    public bool HasLogs => LogLines.Count > 0;
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
     public string LastUpdateText => _settings.LastSubscriptionUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
 
@@ -119,10 +129,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MediaBrush HomeNavBackground => NavBackground("Home");
     public MediaBrush NodesNavBackground => NavBackground("Nodes");
     public MediaBrush SubscriptionNavBackground => NavBackground("Subscription");
+    public MediaBrush LogsNavBackground => NavBackground("Logs");
     public MediaBrush SettingsNavBackground => NavBackground("Settings");
     public MediaBrush HomeNavForeground => NavForeground("Home");
     public MediaBrush NodesNavForeground => NavForeground("Nodes");
     public MediaBrush SubscriptionNavForeground => NavForeground("Subscription");
+    public MediaBrush LogsNavForeground => NavForeground("Logs");
     public MediaBrush SettingsNavForeground => NavForeground("Settings");
 
     private ProxyNode? ActiveNode => _nodes.FirstOrDefault(node => node.Id == _settings.ActiveNodeId) ?? _nodes.FirstOrDefault();
@@ -146,6 +158,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ApplySettingsToControls();
         RefreshActiveFlags();
         RefreshFilteredNodes();
+        RefreshLogLines();
         RefreshStatusProperties();
 
         if (_settings.AutoConnectOnLaunch && ActiveNode is not null && File.Exists(_xrayService.XrayExePath))
@@ -159,6 +172,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SubscriptionUrlTextBox.Text = _settings.SubscriptionUrl;
         HttpPortTextBox.Text = _settings.HttpPort.ToString();
         SocksPortTextBox.Text = _settings.SocksPort.ToString();
+        DelayTestUrlTextBox.Text = _settings.DelayTestUrl;
         StartOnBootCheckBox.IsChecked = _settings.StartOnBoot;
         SidebarStartupCheckBox.IsChecked = _settings.StartOnBoot;
         AutoConnectCheckBox.IsChecked = _settings.AutoConnectOnLaunch;
@@ -173,7 +187,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var notifyIcon = new WinForms.NotifyIcon
         {
             Text = "MyRay Lite",
-            Icon = System.Drawing.SystemIcons.Application,
+            Icon = new System.Drawing.Icon(Path.Combine(AppContext.BaseDirectory, "Assets", "app.ico")),
             Visible = true,
             ContextMenuStrip = new WinForms.ContextMenuStrip()
         };
@@ -227,6 +241,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             _isProxyEnabled = false;
             ToastMessage = ex.Message;
+            RefreshLogLines();
         }
         finally
         {
@@ -302,6 +317,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await _store.SaveSettingsAsync(_settings);
         ToastMessage = "正在更新订阅...";
         SubscriptionStatus = "更新中";
+        _log.Info("开始更新订阅。");
 
         var snapshot = await _subscriptionService.UpdateAsync(_settings);
         _nodes.Clear();
@@ -318,6 +334,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         SubscriptionStatus = snapshot.StatusText;
         ToastMessage = snapshot.StatusText;
+        _log.Info($"订阅更新完成：{snapshot.StatusText}，节点 {snapshot.Nodes.Count} 个。");
         RefreshActiveFlags();
         RefreshFilteredNodes();
         RefreshStatusProperties();
@@ -337,7 +354,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void TestAllNodes_Click(object sender, RoutedEventArgs e)
     {
         ToastMessage = "正在测速...";
-        await _delayTestService.TestManyAsync(_nodes, _ =>
+        await _delayTestService.TestManyAsync(_nodes, _settings.DelayTestUrl, _ =>
         {
             Dispatcher.Invoke(() =>
             {
@@ -347,6 +364,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         });
         await _store.SaveNodesAsync(_nodes);
         ToastMessage = "测速完成。";
+        RefreshLogLines();
     }
 
     private async Task TestNodeAsync(ProxyNode node)
@@ -355,7 +373,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
         RefreshStatusProperties();
 
-        var delay = await _delayTestService.TestTcpDelayAsync(node, TimeSpan.FromSeconds(5));
+        var delay = await _delayTestService.TestProxyDelayAsync(node, _settings.DelayTestUrl, TimeSpan.FromSeconds(10));
         node.DelayMs = delay;
         node.Status = delay is null ? NodeStatus.Unavailable : NodeStatus.Available;
         node.LastTested = DateTimeOffset.Now;
@@ -364,6 +382,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
         RefreshStatusProperties();
         ToastMessage = delay is null ? "节点不可用。" : $"延迟 {delay}ms。";
+        RefreshLogLines();
     }
 
     private void RefreshNodes_Click(object sender, RoutedEventArgs e)
@@ -445,6 +464,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await _store.SaveSettingsAsync(_settings);
     }
 
+    private async void DelayTestUrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        _settings.DelayTestUrl = string.IsNullOrWhiteSpace(DelayTestUrlTextBox.Text)
+            ? "http://www.gstatic.com/generate_204"
+            : DelayTestUrlTextBox.Text.Trim();
+        await _store.SaveSettingsAsync(_settings);
+    }
+
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _searchText = SearchTextBox.Text.Trim();
@@ -460,11 +492,37 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var progress = new Progress<double>(value => ToastMessage = $"正在下载 Xray-core {value:P0}");
             var directory = await _downloadService.DownloadLatestWindowsX64Async(progress);
             ToastMessage = $"Xray-core 已下载到 {directory}";
+            _log.Info($"Xray-core 已下载到 {directory}");
         }
         catch (Exception ex)
         {
             ToastMessage = $"下载失败：{ex.Message}";
+            _log.Error(ToastMessage);
+            RefreshLogLines();
         }
+    }
+
+    private void RefreshLogs_Click(object sender, RoutedEventArgs e)
+    {
+        RefreshLogLines();
+        ToastMessage = "日志已刷新。";
+    }
+
+    private void ClearLogs_Click(object sender, RoutedEventArgs e)
+    {
+        _log.Clear();
+        RefreshLogLines();
+        ToastMessage = "日志已清空。";
+    }
+
+    private void OpenLogFolder_Click(object sender, RoutedEventArgs e)
+    {
+        _paths.Ensure();
+        Process.Start(new ProcessStartInfo
+        {
+            FileName = _paths.LogDirectory,
+            UseShellExecute = true
+        });
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e)
@@ -528,6 +586,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Notify(nameof(NodeCount));
     }
 
+    private void RefreshLogLines()
+    {
+        LogLines.Clear();
+        foreach (var line in _log.ReadRecentLines())
+        {
+            LogLines.Add(line);
+        }
+
+        Notify(nameof(LogLines));
+        Notify(nameof(HasLogs));
+    }
+
     private bool MatchesSearch(ProxyNode node)
     {
         return string.IsNullOrWhiteSpace(_searchText)
@@ -563,10 +633,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Notify(nameof(HomeNavBackground));
         Notify(nameof(NodesNavBackground));
         Notify(nameof(SubscriptionNavBackground));
+        Notify(nameof(LogsNavBackground));
         Notify(nameof(SettingsNavBackground));
         Notify(nameof(HomeNavForeground));
         Notify(nameof(NodesNavForeground));
         Notify(nameof(SubscriptionNavForeground));
+        Notify(nameof(LogsNavForeground));
         Notify(nameof(SettingsNavForeground));
     }
 

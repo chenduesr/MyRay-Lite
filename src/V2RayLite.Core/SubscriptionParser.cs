@@ -6,6 +6,8 @@ namespace V2RayLite.Core;
 
 public sealed class SubscriptionParser
 {
+    private static readonly string[] SupportedSchemes = ["vmess://", "vless://", "trojan://", "ss://", "socks://", "http://", "https://"];
+
     public IReadOnlyList<ProxyNode> Parse(string payload)
     {
         if (string.IsNullOrWhiteSpace(payload))
@@ -13,23 +15,79 @@ public sealed class SubscriptionParser
             return [];
         }
 
-        var text = DecodeBase64IfNeeded(payload.Trim());
-        var lines = text
-            .Split(['\r', '\n'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
-            .Where(line => !line.StartsWith("#", StringComparison.Ordinal))
-            .ToArray();
-
+        var candidates = ExpandPayload(payload.Trim());
         var nodes = new List<ProxyNode>();
-        foreach (var line in lines)
+
+        foreach (var line in candidates)
         {
-            var node = ParseLine(line);
-            if (node is not null)
+            try
             {
-                nodes.Add(node);
+                var node = ParseLine(line);
+                if (node is not null)
+                {
+                    nodes.Add(node);
+                }
+            }
+            catch
+            {
+                // Skip malformed entries and keep the rest of the subscription usable.
             }
         }
 
-        return nodes;
+        if (nodes.Count == 0)
+        {
+            nodes.AddRange(ParseClashYaml(DecodeBase64IfNeeded(payload.Trim())));
+        }
+
+        return nodes
+            .GroupBy(node => node.Id)
+            .Select(group => group.First())
+            .ToList();
+    }
+
+    private static IEnumerable<string> ExpandPayload(string payload)
+    {
+        var decoded = DecodeBase64IfNeeded(payload);
+        foreach (var text in new[] { payload, decoded }.Distinct())
+        {
+            foreach (var token in ExtractLinks(text))
+            {
+                yield return token;
+            }
+        }
+    }
+
+    private static IEnumerable<string> ExtractLinks(string text)
+    {
+        var normalized = text.Replace("\r", "\n");
+        foreach (var line in normalized.Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (line.StartsWith("#", StringComparison.Ordinal) || line.StartsWith("proxies:", StringComparison.OrdinalIgnoreCase))
+            {
+                continue;
+            }
+
+            if (SupportedSchemes.Any(scheme => line.StartsWith(scheme, StringComparison.OrdinalIgnoreCase)))
+            {
+                yield return line;
+                continue;
+            }
+
+            foreach (var scheme in SupportedSchemes)
+            {
+                var index = line.IndexOf(scheme, StringComparison.OrdinalIgnoreCase);
+                while (index >= 0)
+                {
+                    var next = SupportedSchemes
+                        .Select(s => line.IndexOf(s, index + scheme.Length, StringComparison.OrdinalIgnoreCase))
+                        .Where(i => i > index)
+                        .DefaultIfEmpty(line.Length)
+                        .Min();
+                    yield return line[index..next].Trim().Trim(',', '"', '\'');
+                    index = line.IndexOf(scheme, next, StringComparison.OrdinalIgnoreCase);
+                }
+            }
+        }
     }
 
     private static ProxyNode? ParseLine(string line)
@@ -57,6 +115,11 @@ public sealed class SubscriptionParser
         if (line.StartsWith("socks://", StringComparison.OrdinalIgnoreCase))
         {
             return ParseUriNode(line, ProtocolType.Socks);
+        }
+
+        if (line.StartsWith("http://", StringComparison.OrdinalIgnoreCase) || line.StartsWith("https://", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParseUriNode(line, ProtocolType.Http);
         }
 
         return null;
@@ -115,9 +178,17 @@ public sealed class SubscriptionParser
         var user = Uri.UnescapeDataString(uri.UserInfo);
         var query = ParseQuery(uri.Query);
         var name = CleanName(string.IsNullOrWhiteSpace(uri.Fragment) ? null : Uri.UnescapeDataString(uri.Fragment), uri.Host);
-
         var network = GetQuery(query, "type", "tcp") ?? "tcp";
         var security = GetQuery(query, "security", protocol == ProtocolType.Trojan ? "tls" : "none") ?? "none";
+
+        string? username = null;
+        string? password = null;
+        if (protocol is ProtocolType.Http or ProtocolType.Socks && !string.IsNullOrWhiteSpace(user))
+        {
+            var parts = user.Split(':', 2);
+            username = parts[0];
+            password = parts.Length == 2 ? parts[1] : null;
+        }
 
         return new ProxyNode
         {
@@ -127,8 +198,8 @@ public sealed class SubscriptionParser
             Name = name,
             Address = uri.Host,
             Port = uri.Port,
-            UserId = protocol == ProtocolType.Vless ? user : null,
-            Password = protocol is ProtocolType.Trojan or ProtocolType.Socks ? user : null,
+            UserId = protocol == ProtocolType.Vless ? user : username,
+            Password = protocol is ProtocolType.Trojan ? user : password,
             Network = network,
             Security = security,
             Flow = GetQuery(query, "flow"),
@@ -149,10 +220,10 @@ public sealed class SubscriptionParser
         var fragmentIndex = withoutScheme.IndexOf('#');
         var name = fragmentIndex >= 0 ? Uri.UnescapeDataString(withoutScheme[(fragmentIndex + 1)..]) : null;
         var body = fragmentIndex >= 0 ? withoutScheme[..fragmentIndex] : withoutScheme;
-        var pluginIndex = body.IndexOf("/?", StringComparison.Ordinal);
-        if (pluginIndex >= 0)
+        var queryIndex = body.IndexOf("/?", StringComparison.Ordinal);
+        if (queryIndex >= 0)
         {
-            body = body[..pluginIndex];
+            body = body[..queryIndex];
         }
 
         var atIndex = body.LastIndexOf('@');
@@ -175,13 +246,13 @@ public sealed class SubscriptionParser
         else
         {
             var decoded = DecodeBase64IfNeeded(body);
-            var atDecodedIndex = decoded.LastIndexOf('@');
-            if (atDecodedIndex < 0)
+            var decodedAt = decoded.LastIndexOf('@');
+            if (decodedAt < 0)
             {
                 return null;
             }
 
-            var parts = decoded[..atDecodedIndex].Split(':', 2);
+            var parts = decoded[..decodedAt].Split(':', 2);
             if (parts.Length != 2)
             {
                 return null;
@@ -189,11 +260,11 @@ public sealed class SubscriptionParser
 
             method = parts[0];
             password = parts[1];
-            hostPort = decoded[(atDecodedIndex + 1)..];
+            hostPort = decoded[(decodedAt + 1)..];
         }
 
-        var hp = hostPort.Split(':', 2);
-        if (hp.Length != 2 || !int.TryParse(hp[1], out var port))
+        var hp = SplitHostPort(hostPort);
+        if (hp is null)
         {
             return null;
         }
@@ -203,12 +274,141 @@ public sealed class SubscriptionParser
             Id = StableId(line),
             Raw = line,
             Protocol = ProtocolType.Shadowsocks,
-            Name = CleanName(name, hp[0]),
-            Address = hp[0],
-            Port = port,
+            Name = CleanName(name, hp.Value.Host),
+            Address = hp.Value.Host,
+            Port = hp.Value.Port,
             Method = method,
             Password = password
         };
+    }
+
+    private static IEnumerable<ProxyNode> ParseClashYaml(string text)
+    {
+        var nodes = new List<ProxyNode>();
+        var current = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        var currentRaw = new StringBuilder();
+
+        foreach (var rawLine in text.Replace("\r", "\n").Split('\n'))
+        {
+            var line = rawLine.TrimEnd();
+            var trimmed = line.Trim();
+            if (trimmed.StartsWith("- {", StringComparison.Ordinal))
+            {
+                FlushInlineClash(trimmed, nodes);
+                continue;
+            }
+
+            if (trimmed.StartsWith("- name:", StringComparison.OrdinalIgnoreCase))
+            {
+                FlushBlockClash(current, currentRaw.ToString(), nodes);
+                current.Clear();
+                currentRaw.Clear();
+                AddYamlKeyValue(current, trimmed[2..]);
+                currentRaw.AppendLine(rawLine);
+                continue;
+            }
+
+            if (current.Count > 0)
+            {
+                currentRaw.AppendLine(rawLine);
+                AddYamlKeyValue(current, trimmed);
+            }
+        }
+
+        FlushBlockClash(current, currentRaw.ToString(), nodes);
+        return nodes;
+    }
+
+    private static void FlushInlineClash(string line, List<ProxyNode> nodes)
+    {
+        var content = line.Trim().TrimStart('-').Trim().Trim('{', '}');
+        var map = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+        foreach (var part in content.Split(',', StringSplitOptions.RemoveEmptyEntries))
+        {
+            AddYamlKeyValue(map, part.Trim());
+        }
+
+        var node = BuildClashNode(map, line);
+        if (node is not null)
+        {
+            nodes.Add(node);
+        }
+    }
+
+    private static void FlushBlockClash(Dictionary<string, string> map, string raw, List<ProxyNode> nodes)
+    {
+        if (map.Count == 0)
+        {
+            return;
+        }
+
+        var node = BuildClashNode(map, raw);
+        if (node is not null)
+        {
+            nodes.Add(node);
+        }
+    }
+
+    private static ProxyNode? BuildClashNode(Dictionary<string, string> map, string raw)
+    {
+        var type = GetMap(map, "type")?.ToLowerInvariant();
+        var server = GetMap(map, "server");
+        var portText = GetMap(map, "port");
+        if (string.IsNullOrWhiteSpace(type) || string.IsNullOrWhiteSpace(server) || !int.TryParse(portText, out var port))
+        {
+            return null;
+        }
+
+        var protocol = type switch
+        {
+            "vmess" => ProtocolType.Vmess,
+            "vless" => ProtocolType.Vless,
+            "trojan" => ProtocolType.Trojan,
+            "ss" => ProtocolType.Shadowsocks,
+            "shadowsocks" => ProtocolType.Shadowsocks,
+            "socks5" => ProtocolType.Socks,
+            "http" => ProtocolType.Http,
+            _ => ProtocolType.Unknown
+        };
+
+        var node = new ProxyNode
+        {
+            Id = StableId(raw),
+            Raw = raw,
+            Name = CleanName(GetMap(map, "name"), server),
+            Address = server,
+            Port = port,
+            Protocol = protocol,
+            UserId = GetMap(map, "uuid", GetMap(map, "username")),
+            Password = GetMap(map, "password"),
+            Method = GetMap(map, "cipher"),
+            AlterId = int.TryParse(GetMap(map, "alterId", GetMap(map, "alter-id")), out var alterId) ? alterId : 0,
+            VmessSecurity = GetMap(map, "security", "auto"),
+            Network = GetMap(map, "network", "tcp") ?? "tcp",
+            Security = IsTrue(GetMap(map, "tls")) ? "tls" : "none",
+            Sni = GetMap(map, "servername", GetMap(map, "sni")),
+            Host = GetMap(map, "Host", GetMap(map, "host")),
+            Path = GetMap(map, "path"),
+            UnsupportedReason = protocol == ProtocolType.Unknown ? $"Xray 暂不支持 Clash 节点类型：{type}" : null
+        };
+
+        return node;
+    }
+
+    private static void AddYamlKeyValue(Dictionary<string, string> map, string text)
+    {
+        var index = text.IndexOf(':');
+        if (index <= 0)
+        {
+            return;
+        }
+
+        var key = text[..index].Trim().Trim('"', '\'');
+        var value = text[(index + 1)..].Trim().Trim('"', '\'');
+        if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
+        {
+            map[key] = value;
+        }
     }
 
     private static Dictionary<string, string> ParseQuery(string query)
@@ -234,15 +434,42 @@ public sealed class SubscriptionParser
         return result;
     }
 
+    private static (string Host, int Port)? SplitHostPort(string value)
+    {
+        var trimmed = value.Trim();
+        if (trimmed.StartsWith("[", StringComparison.Ordinal))
+        {
+            var close = trimmed.IndexOf(']');
+            if (close > 0 && close + 2 < trimmed.Length && int.TryParse(trimmed[(close + 2)..], out var ipv6Port))
+            {
+                return (trimmed[1..close], ipv6Port);
+            }
+        }
+
+        var hp = trimmed.Split(':', 2);
+        return hp.Length == 2 && int.TryParse(hp[1], out var port) ? (hp[0], port) : null;
+    }
+
     private static string? GetQuery(Dictionary<string, string> query, string key, string? fallback = null)
     {
         return query.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
     }
 
+    private static string? GetMap(Dictionary<string, string> map, string key, string? fallback = null)
+    {
+        return map.TryGetValue(key, out var value) && !string.IsNullOrWhiteSpace(value) ? value : fallback;
+    }
+
+    private static bool IsTrue(string? value)
+    {
+        return string.Equals(value, "true", StringComparison.OrdinalIgnoreCase)
+            || string.Equals(value, "1", StringComparison.OrdinalIgnoreCase);
+    }
+
     private static string DecodeBase64IfNeeded(string value)
     {
         var trimmed = value.Trim();
-        if (trimmed.Contains("://", StringComparison.Ordinal) || trimmed.StartsWith('{'))
+        if (trimmed.Contains("://", StringComparison.Ordinal) || trimmed.StartsWith('{') || trimmed.Contains("proxies:", StringComparison.OrdinalIgnoreCase))
         {
             return trimmed;
         }
@@ -283,6 +510,8 @@ public sealed class SubscriptionParser
         {
             JsonValueKind.String => property.GetString(),
             JsonValueKind.Number => property.GetRawText(),
+            JsonValueKind.True => "true",
+            JsonValueKind.False => "false",
             _ => null
         };
     }

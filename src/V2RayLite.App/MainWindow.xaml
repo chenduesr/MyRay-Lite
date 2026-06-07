@@ -308,6 +308,12 @@
                                 <TextBlock Text="订阅" FontSize="19" Margin="16,0,0,0" VerticalAlignment="Center" />
                             </StackPanel>
                         </Button>
+                        <Button Style="{StaticResource NavButton}" Tag="Logs" Click="Navigate_Click" Background="{Binding LogsNavBackground}" Foreground="{Binding LogsNavForeground}">
+                            <StackPanel Orientation="Horizontal">
+                                <TextBlock Style="{StaticResource IconText}" Text="&#xE9D9;" Width="38" />
+                                <TextBlock Text="日志" FontSize="19" Margin="16,0,0,0" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Button>
                         <Button Style="{StaticResource NavButton}" Tag="Settings" Click="Navigate_Click" Background="{Binding SettingsNavBackground}" Foreground="{Binding SettingsNavForeground}">
                             <StackPanel Orientation="Horizontal">
                                 <TextBlock Style="{StaticResource IconText}" Text="&#xE713;" Width="38" />
@@ -573,11 +579,14 @@
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
+                                        <RowDefinition Height="58" />
                                     </Grid.RowDefinitions>
                                     <TextBlock Text="HTTP:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <TextBox x:Name="HttpPortTextBox" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
                                     <TextBlock Grid.Row="1" Text="SOCKS:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <TextBox x:Name="SocksPortTextBox" Grid.Row="1" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="2" Text="测速URL:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox x:Name="DelayTestUrlTextBox" Grid.Row="2" Grid.Column="1" TextChanged="DelayTestUrlTextBox_TextChanged" />
                                 </Grid>
                             </Border>
 
@@ -591,6 +600,43 @@
                                 </Grid>
                             </Border>
                         </StackPanel>
+                    </Grid>
+
+                    <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Logs}">
+                        <Grid Width="880" HorizontalAlignment="Center" Margin="0,32,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="日志诊断" FontSize="42" FontWeight="Black" Foreground="{StaticResource TextBrush}" Margin="0,18,0,24" />
+                            <Grid Grid.Row="1" Margin="0,0,0,18">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="130" />
+                                </Grid.ColumnDefinitions>
+                                <TextBlock Text="显示应用日志、Xray 启动日志和测速诊断。Xray 启动失败时优先看这里。" Foreground="{StaticResource SubtleTextBrush}" FontSize="16" VerticalAlignment="Center" />
+                                <Button Grid.Column="1" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="RefreshLogs_Click" Content="刷新" />
+                                <Button Grid.Column="2" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="ClearLogs_Click" Content="清空" />
+                                <Button Grid.Column="3" Style="{StaticResource PrimaryButton}" Height="44" Margin="12,0,0,0" Click="OpenLogFolder_Click" Content="打开目录" />
+                            </Grid>
+                            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="430">
+                                <Grid>
+                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="18">
+                                        <ItemsControl ItemsSource="{Binding LogLines}">
+                                            <ItemsControl.ItemTemplate>
+                                                <DataTemplate>
+                                                    <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="13" Foreground="#263445" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                </DataTemplate>
+                                            </ItemsControl.ItemTemplate>
+                                        </ItemsControl>
+                                    </ScrollViewer>
+                                    <TextBlock Text="暂无日志" Visibility="{Binding HasLogs, Converter={StaticResource InverseBoolVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8B97A8" FontSize="18" />
+                                </Grid>
+                            </Border>
+                        </Grid>
                     </Grid>
                 </Grid>
 

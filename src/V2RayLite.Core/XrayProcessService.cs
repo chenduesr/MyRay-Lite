@@ -6,12 +6,15 @@ public sealed class XrayProcessService
 {
     private readonly AppPaths _paths;
     private readonly XrayConfigBuilder _configBuilder;
+    private readonly AppLogService _log;
     private Process? _process;
+    private string? _runtimeLogFile;
 
-    public XrayProcessService(AppPaths paths, XrayConfigBuilder configBuilder)
+    public XrayProcessService(AppPaths paths, XrayConfigBuilder configBuilder, AppLogService log)
     {
         _paths = paths;
         _configBuilder = configBuilder;
+        _log = log;
     }
 
     public bool IsRunning => _process is { HasExited: false };
@@ -34,6 +37,7 @@ public sealed class XrayProcessService
         _paths.Ensure();
         var config = _configBuilder.Build(node, settings);
         await File.WriteAllTextAsync(_paths.GeneratedConfigFile, config, cancellationToken);
+        _runtimeLogFile = Path.Combine(_paths.LogDirectory, $"xray-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
         _process = new Process
         {
@@ -50,13 +54,20 @@ public sealed class XrayProcessService
             EnableRaisingEvents = true
         };
 
-        _process.Start();
-        _ = Task.Run(() => DrainLogsAsync(_process), CancellationToken.None);
-        await Task.Delay(700, cancellationToken);
+        _process.OutputDataReceived += (_, e) => AppendXrayLog(e.Data);
+        _process.ErrorDataReceived += (_, e) => AppendXrayLog(e.Data);
+        _process.Exited += (_, _) => _log.Warn("Xray 进程已退出。");
 
+        _log.Info($"启动 Xray：{node.Name} ({node.Protocol} {node.Address}:{node.Port})");
+        _process.Start();
+        _process.BeginOutputReadLine();
+        _process.BeginErrorReadLine();
+
+        await Task.Delay(800, cancellationToken);
         if (_process.HasExited)
         {
-            throw new InvalidOperationException("Xray 启动失败，请检查节点配置和端口是否被占用。");
+            _log.Error("Xray 启动失败，请检查节点配置、端口占用或日志页面。");
+            throw new InvalidOperationException("Xray 启动失败，请检查节点配置、端口占用或日志页面。");
         }
 
         return "Xray 已启动";
@@ -73,13 +84,14 @@ public sealed class XrayProcessService
         {
             if (!_process.HasExited)
             {
+                _log.Info("正在停止 Xray。");
                 _process.Kill(entireProcessTree: true);
                 _process.WaitForExit(2000);
             }
         }
-        catch
+        catch (Exception ex)
         {
-            // Best effort on app shutdown.
+            _log.Warn($"停止 Xray 时发生异常：{ex.Message}");
         }
         finally
         {
@@ -88,24 +100,21 @@ public sealed class XrayProcessService
         }
     }
 
-    private async Task DrainLogsAsync(Process process)
+    private void AppendXrayLog(string? line)
     {
+        if (string.IsNullOrWhiteSpace(line) || string.IsNullOrWhiteSpace(_runtimeLogFile))
+        {
+            return;
+        }
+
         try
         {
-            var stdout = await process.StandardOutput.ReadToEndAsync();
-            var stderr = await process.StandardError.ReadToEndAsync();
-            if (string.IsNullOrWhiteSpace(stdout) && string.IsNullOrWhiteSpace(stderr))
-            {
-                return;
-            }
-
             _paths.Ensure();
-            var logFile = Path.Combine(_paths.LogDirectory, $"xray-{DateTime.Now:yyyyMMdd-HHmmss}.log");
-            await File.WriteAllTextAsync(logFile, stdout + Environment.NewLine + stderr);
+            File.AppendAllText(_runtimeLogFile, line + Environment.NewLine);
         }
         catch
         {
-            // Logging cannot block runtime control.
+            // Runtime logging is best effort.
         }
     }
 }

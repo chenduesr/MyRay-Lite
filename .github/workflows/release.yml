@@ -1,0 +1,66 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Publish self-contained app
+        shell: pwsh
+        run: |
+          dotnet publish src/V2RayLite.App/V2RayLite.App.csproj `
+            -c Release `
+            -r win-x64 `
+            --self-contained true `
+            -p:NuGetAudit=false `
+            -o publish/MyRay-Lite-win-x64
+
+      - name: Download Xray-core
+        shell: pwsh
+        run: |
+          $headers = @{ "User-Agent" = "MyRayLite-release" }
+          $release = Invoke-RestMethod -Uri "https://api.github.com/repos/XTLS/Xray-core/releases/latest" -Headers $headers
+          $asset = $release.assets | Where-Object { $_.name -match "windows-64.*\.zip$" } | Select-Object -First 1
+          if (-not $asset) { throw "No Windows x64 Xray-core asset found." }
+          New-Item -ItemType Directory -Force -Path publish/MyRay-Lite-win-x64/bin/xray | Out-Null
+          $zip = Join-Path $env:TEMP "xray.zip"
+          $extract = Join-Path $env:TEMP "xray"
+          Invoke-WebRequest -Uri $asset.browser_download_url -Headers $headers -OutFile $zip
+          Expand-Archive -LiteralPath $zip -DestinationPath $extract -Force
+          Get-ChildItem -Path $extract -Recurse -Include xray.exe,geoip.dat,geosite.dat |
+            Copy-Item -Destination publish/MyRay-Lite-win-x64/bin/xray -Force
+
+      - name: Create zip
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path release | Out-Null
+          Compress-Archive -Path publish/MyRay-Lite-win-x64/* `
+            -DestinationPath "release/MyRay-Lite-${{ github.ref_name }}-win-x64.zip" `
+            -CompressionLevel Optimal
+
+      - name: Upload GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: "MyRay Lite ${{ github.ref_name }}"
+          body: |
+            Windows x64 便携版。
+
+            下载 zip 后解压，运行 MyRayLite.exe 即可。
+            已包含 Xray-core、geoip.dat、geosite.dat。
+          files: release/*.zip

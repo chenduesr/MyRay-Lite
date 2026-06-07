@@ -7,6 +7,11 @@ public sealed class XrayConfigBuilder
 {
     public string Build(ProxyNode node, AppSettings settings)
     {
+        if (!node.IsSupportedByXray)
+        {
+            throw new NotSupportedException(node.UnsupportedReason ?? $"Xray 暂不支持协议：{node.Protocol}");
+        }
+
         var proxyOutbound = BuildProxyOutbound(node);
         var routing = BuildRouting(settings.ProxyMode);
         var config = new JsonObject
@@ -64,6 +69,7 @@ public sealed class XrayConfigBuilder
             ProtocolType.Trojan => BuildTrojan(node),
             ProtocolType.Shadowsocks => BuildShadowsocks(node),
             ProtocolType.Socks => BuildSocks(node),
+            ProtocolType.Http => BuildHttp(node),
             _ => throw new InvalidOperationException($"Unsupported protocol: {node.Protocol}")
         };
     }
@@ -173,20 +179,60 @@ public sealed class XrayConfigBuilder
 
     private static JsonObject BuildSocks(ProxyNode node)
     {
+        var server = new JsonObject
+        {
+            ["address"] = node.Address,
+            ["port"] = node.Port
+        };
+        if (!string.IsNullOrWhiteSpace(node.UserId))
+        {
+            server["users"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["user"] = node.UserId,
+                    ["pass"] = node.Password
+                }
+            };
+        }
+
         return new JsonObject
         {
             ["tag"] = "proxy",
             ["protocol"] = "socks",
             ["settings"] = new JsonObject
             {
-                ["servers"] = new JsonArray
+                ["servers"] = new JsonArray { server }
+            }
+        };
+    }
+
+    private static JsonObject BuildHttp(ProxyNode node)
+    {
+        var server = new JsonObject
+        {
+            ["address"] = node.Address,
+            ["port"] = node.Port
+        };
+        if (!string.IsNullOrWhiteSpace(node.UserId))
+        {
+            server["users"] = new JsonArray
+            {
+                new JsonObject
                 {
-                    new JsonObject
-                    {
-                        ["address"] = node.Address,
-                        ["port"] = node.Port
-                    }
+                    ["user"] = node.UserId,
+                    ["pass"] = node.Password
                 }
+            };
+        }
+
+        return new JsonObject
+        {
+            ["tag"] = "proxy",
+            ["protocol"] = "http",
+            ["settings"] = new JsonObject
+            {
+                ["servers"] = new JsonArray { server }
             }
         };
     }

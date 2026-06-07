@@ -14,6 +14,7 @@ public enum ProtocolType
     Trojan,
     Shadowsocks,
     Socks,
+    Http,
     Unknown
 }
 
@@ -34,6 +35,7 @@ public sealed class AppSettings
     public bool MinimizeToTray { get; set; } = true;
     public int HttpPort { get; set; } = 7890;
     public int SocksPort { get; set; } = 7891;
+    public string DelayTestUrl { get; set; } = "http://www.gstatic.com/generate_204";
     public string? ActiveNodeId { get; set; }
     public DateTimeOffset? LastSubscriptionUpdate { get; set; }
 }
@@ -62,10 +64,18 @@ public sealed class ProxyNode
     public string? SpiderX { get; set; }
     public int AlterId { get; set; }
     public string? VmessSecurity { get; set; }
+    public string? UnsupportedReason { get; set; }
     public int? DelayMs { get; set; }
     public NodeStatus Status { get; set; } = NodeStatus.Unknown;
     public DateTimeOffset? LastTested { get; set; }
     public bool IsActive { get; set; }
+
+    public bool IsSupportedByXray => Protocol is ProtocolType.Vmess
+        or ProtocolType.Vless
+        or ProtocolType.Trojan
+        or ProtocolType.Shadowsocks
+        or ProtocolType.Socks
+        or ProtocolType.Http;
 
     public string DisplayDelay => Status switch
     {
@@ -88,4 +98,16 @@ public sealed class RuntimeState
     public bool IsProxyEnabled { get; set; }
     public string StatusText => IsProxyEnabled ? "已开启" : "未开启";
     public string SidebarStatus => IsProxyEnabled ? "已连接" : "未连接";
+}
+
+public sealed class LogEntry
+{
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
+    public string Level { get; set; } = "INFO";
+    public string Message { get; set; } = string.Empty;
+
+    public override string ToString()
+    {
+        return $"[{Timestamp:yyyy-MM-dd HH:mm:ss}] [{Level}] {Message}";
+    }
 }

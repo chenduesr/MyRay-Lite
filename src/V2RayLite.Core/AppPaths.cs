@@ -10,6 +10,7 @@ public sealed class AppPaths
         NodesFile = Path.Combine(AppDataRoot, "nodes.json");
         GeneratedConfigFile = Path.Combine(AppDataRoot, "xray.generated.json");
         LogDirectory = Path.Combine(AppDataRoot, "logs");
+        AppLogFile = Path.Combine(LogDirectory, "myray-lite.log");
     }
 
     public string AppDataRoot { get; }
@@ -17,6 +18,7 @@ public sealed class AppPaths
     public string NodesFile { get; }
     public string GeneratedConfigFile { get; }
     public string LogDirectory { get; }
+    public string AppLogFile { get; }
 
     public void Ensure()
     {

@@ -4,6 +4,7 @@ obj/
 .dotnet_home/
 publish/
 release/
+backups/
 *.user
 *.suo
 *.tmp
