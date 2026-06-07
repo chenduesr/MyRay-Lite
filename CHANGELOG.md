@@ -1,5 +1,41 @@
 # Changelog
 
+## Unreleased
+
+### Tray Menu
+
+- Added a full tray context menu.
+- Supports viewing current status and active node from the tray.
+- Supports opening the main window, node list, settings page, and logs page.
+- Supports starting/stopping the proxy from the tray.
+- Supports quick node switching from the tray menu.
+
+### Routing Rules
+
+- Added advanced routing settings.
+- Supports bypassing mainland China domains and IP ranges.
+- Supports smart, whitelist, and blacklist routing templates.
+- Supports custom direct domain/IP rules.
+- Supports custom proxy domain/IP rules.
+- Supports custom block domain/IP rules.
+- Xray routing config generation now includes these custom rules.
+
+### DNS
+
+- Added DNS settings to the UI.
+- Supports custom DNS enable/disable.
+- Supports FakeDNS enable/disable.
+- Supports domestic/foreign DNS split mode.
+- Supports normal DNS, DoH, and DoT server configuration.
+- Xray config generation now emits DNS and FakeDNS settings when enabled.
+
+### UI Polish
+
+- Added dark mode.
+- Added a lightweight window fade-in animation.
+- Improved settings page scrolling for larger advanced configuration sections.
+- Unified button, input, card, and multiline text box styling for a cleaner layout.
+
 ## v1.1.0
 
 ### Independence

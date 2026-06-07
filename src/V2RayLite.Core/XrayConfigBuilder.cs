@@ -13,7 +13,7 @@ public sealed class XrayConfigBuilder
         }
 
         var proxyOutbound = BuildProxyOutbound(node);
-        var routing = BuildRouting(settings.ProxyMode);
+        var routing = BuildRouting(settings.ProxyMode, settings);
         var config = new JsonObject
         {
             ["log"] = new JsonObject
@@ -56,6 +56,24 @@ public sealed class XrayConfigBuilder
             },
             ["routing"] = routing
         };
+
+        var dns = BuildDns(settings);
+        if (dns is not null)
+        {
+            config["dns"] = dns;
+        }
+
+        if (settings.EnableCustomDns && settings.EnableFakeDns)
+        {
+            config["fakedns"] = new JsonArray
+            {
+                new JsonObject
+                {
+                    ["ipPool"] = "198.18.0.0/16",
+                    ["poolSize"] = 65535
+                }
+            };
+        }
 
         return config.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
@@ -308,23 +326,40 @@ public sealed class XrayConfigBuilder
         };
     }
 
-    private static JsonObject BuildRouting(ProxyMode mode)
+    private static JsonObject BuildRouting(ProxyMode mode, AppSettings settings)
     {
         var rules = new JsonArray();
         if (mode == ProxyMode.Rule)
         {
-            rules.Add(new JsonObject
+            AddCustomRoutingRule(rules, "block", ParseList(settings.BlockDomains), ParseList(settings.BlockIps));
+            AddCustomRoutingRule(rules, "proxy", ParseList(settings.ProxyDomains), ParseList(settings.ProxyIps));
+            AddCustomRoutingRule(rules, "direct", ParseList(settings.DirectDomains), ParseList(settings.DirectIps));
+
+            if (settings.BypassMainland)
             {
-                ["type"] = "field",
-                ["ip"] = new JsonArray("geoip:private", "geoip:cn"),
-                ["outboundTag"] = "direct"
-            });
-            rules.Add(new JsonObject
+                rules.Add(new JsonObject
+                {
+                    ["type"] = "field",
+                    ["ip"] = new JsonArray("geoip:private", "geoip:cn"),
+                    ["outboundTag"] = "direct"
+                });
+                rules.Add(new JsonObject
+                {
+                    ["type"] = "field",
+                    ["domain"] = new JsonArray("geosite:cn"),
+                    ["outboundTag"] = "direct"
+                });
+            }
+
+            if (settings.RoutingRuleMode == RoutingRuleMode.Whitelist)
             {
-                ["type"] = "field",
-                ["domain"] = new JsonArray("geosite:cn"),
-                ["outboundTag"] = "direct"
-            });
+                rules.Add(new JsonObject
+                {
+                    ["type"] = "field",
+                    ["network"] = "tcp,udp",
+                    ["outboundTag"] = "direct"
+                });
+            }
         }
 
         return new JsonObject
@@ -332,6 +367,105 @@ public sealed class XrayConfigBuilder
             ["domainStrategy"] = "AsIs",
             ["rules"] = rules
         };
+    }
+
+    private static JsonObject? BuildDns(AppSettings settings)
+    {
+        if (!settings.EnableCustomDns)
+        {
+            return null;
+        }
+
+        var servers = new JsonArray();
+        if (settings.EnableFakeDns)
+        {
+            servers.Add("fakedns");
+        }
+
+        var domesticServers = ParseList(settings.DomesticDns);
+        var foreignServers = ParseList(settings.ForeignDns);
+        var dohServers = ParseList(settings.DohDns);
+        var dotServers = ParseList(settings.DotDns);
+
+        if (settings.EnableSplitDns)
+        {
+            foreach (var server in domesticServers.DefaultIfEmpty("223.5.5.5"))
+            {
+                servers.Add(new JsonObject
+                {
+                    ["address"] = server,
+                    ["domains"] = new JsonArray("geosite:cn"),
+                    ["expectIPs"] = new JsonArray("geoip:cn")
+                });
+            }
+
+            foreach (var server in foreignServers.Concat(dohServers).Concat(dotServers).DefaultIfEmpty("1.1.1.1"))
+            {
+                servers.Add(new JsonObject
+                {
+                    ["address"] = server,
+                    ["domains"] = new JsonArray("geosite:geolocation-!cn")
+                });
+            }
+        }
+        else
+        {
+            foreach (var server in domesticServers.Concat(foreignServers).Concat(dohServers).Concat(dotServers))
+            {
+                servers.Add(server);
+            }
+        }
+
+        if (servers.Count == 0)
+        {
+            servers.Add("1.1.1.1");
+        }
+
+        return new JsonObject
+        {
+            ["queryStrategy"] = settings.EnableFakeDns ? "UseIP" : "UseIPv4",
+            ["servers"] = servers
+        };
+    }
+
+    private static void AddCustomRoutingRule(JsonArray rules, string outboundTag, IReadOnlyList<string> domains, IReadOnlyList<string> ips)
+    {
+        if (domains.Count == 0 && ips.Count == 0)
+        {
+            return;
+        }
+
+        var rule = new JsonObject
+        {
+            ["type"] = "field",
+            ["outboundTag"] = outboundTag
+        };
+
+        if (domains.Count > 0)
+        {
+            rule["domain"] = new JsonArray(domains.Select(item => JsonValue.Create(item)).ToArray());
+        }
+
+        if (ips.Count > 0)
+        {
+            rule["ip"] = new JsonArray(ips.Select(item => JsonValue.Create(item)).ToArray());
+        }
+
+        rules.Add(rule);
+    }
+
+    private static List<string> ParseList(string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return [];
+        }
+
+        return value
+            .Split(['\r', '\n', ',', ';', ' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Where(item => !string.IsNullOrWhiteSpace(item))
+            .Distinct(StringComparer.OrdinalIgnoreCase)
+            .ToList();
     }
 
     private static void AddIfNotEmpty(JsonObject target, string key, string? value)

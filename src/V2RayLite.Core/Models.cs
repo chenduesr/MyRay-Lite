@@ -7,6 +7,13 @@ public enum ProxyMode
     Direct
 }
 
+public enum RoutingRuleMode
+{
+    Smart,
+    Whitelist,
+    Blacklist
+}
+
 public enum ProtocolType
 {
     Vmess,
@@ -30,12 +37,28 @@ public sealed class AppSettings
 {
     public string SubscriptionUrl { get; set; } = string.Empty;
     public ProxyMode ProxyMode { get; set; } = ProxyMode.Rule;
+    public RoutingRuleMode RoutingRuleMode { get; set; } = RoutingRuleMode.Smart;
     public bool StartOnBoot { get; set; } = true;
     public bool AutoConnectOnLaunch { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
+    public bool DarkMode { get; set; }
     public int HttpPort { get; set; } = 7890;
     public int SocksPort { get; set; } = 7891;
     public string DelayTestUrl { get; set; } = "http://www.gstatic.com/generate_204";
+    public bool BypassMainland { get; set; } = true;
+    public string DirectDomains { get; set; } = string.Empty;
+    public string DirectIps { get; set; } = string.Empty;
+    public string ProxyDomains { get; set; } = string.Empty;
+    public string ProxyIps { get; set; } = string.Empty;
+    public string BlockDomains { get; set; } = string.Empty;
+    public string BlockIps { get; set; } = string.Empty;
+    public bool EnableCustomDns { get; set; }
+    public bool EnableFakeDns { get; set; }
+    public bool EnableSplitDns { get; set; } = true;
+    public string DomesticDns { get; set; } = "223.5.5.5";
+    public string ForeignDns { get; set; } = "1.1.1.1";
+    public string DohDns { get; set; } = "https://dns.google/dns-query";
+    public string DotDns { get; set; } = "tls://1.1.1.1";
     public string? ActiveNodeId { get; set; }
     public DateTimeOffset? LastSubscriptionUpdate { get; set; }
 }

@@ -23,6 +23,7 @@
         <SolidColorBrush x:Key="SidebarTextBrush" Color="#334155" />
         <SolidColorBrush x:Key="SurfaceBrush" Color="#F6F8FC" />
         <SolidColorBrush x:Key="PanelBrush" Color="#FFFFFF" />
+        <SolidColorBrush x:Key="InputBrush" Color="#FFFFFF" />
         <SolidColorBrush x:Key="LineBrush" Color="#E1E8F2" />
 
         <Style TargetType="Control">
@@ -129,7 +130,7 @@
         </Style>
 
         <Style x:Key="OutlineButton" TargetType="Button" BasedOn="{StaticResource PrimaryButton}">
-            <Setter Property="Background" Value="White" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="Foreground" Value="{StaticResource BlueBrush}" />
             <Setter Property="BorderBrush" Value="#D5DFEC" />
             <Setter Property="FontSize" Value="17" />
@@ -138,7 +139,7 @@
 
         <Style x:Key="GhostButton" TargetType="Button">
             <Setter Property="Height" Value="48" />
-            <Setter Property="Background" Value="White" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="#D5DFEC" />
             <Setter Property="Foreground" Value="{StaticResource BlueBrush}" />
             <Setter Property="FontSize" Value="17" />
@@ -179,7 +180,7 @@
             <Setter Property="VerticalContentAlignment" Value="Center" />
             <Setter Property="BorderBrush" Value="#D5DFEC" />
             <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="Background" Value="White" />
+            <Setter Property="Background" Value="{StaticResource InputBrush}" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
             <Setter Property="FontSize" Value="17" />
             <Setter Property="Template">
@@ -190,7 +191,7 @@
                                 BorderBrush="{TemplateBinding BorderBrush}"
                                 BorderThickness="{TemplateBinding BorderThickness}"
                                 CornerRadius="8">
-                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="Center" />
+                            <ScrollViewer x:Name="PART_ContentHost" Margin="{TemplateBinding Padding}" VerticalAlignment="{TemplateBinding VerticalContentAlignment}" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsKeyboardFocusWithin" Value="True">
@@ -200,6 +201,16 @@
                     </ControlTemplate>
                 </Setter.Value>
             </Setter>
+        </Style>
+
+        <Style x:Key="MultiLineTextBox" TargetType="TextBox" BasedOn="{StaticResource {x:Type TextBox}}">
+            <Setter Property="Height" Value="74" />
+            <Setter Property="Padding" Value="14,10" />
+            <Setter Property="AcceptsReturn" Value="True" />
+            <Setter Property="TextWrapping" Value="Wrap" />
+            <Setter Property="VerticalScrollBarVisibility" Value="Auto" />
+            <Setter Property="VerticalContentAlignment" Value="Top" />
+            <Setter Property="FontSize" Value="15" />
         </Style>
 
         <Style TargetType="CheckBox">
@@ -258,7 +269,8 @@
         </Style>
     </Window.Resources>
 
-    <Border Margin="36"
+    <Border x:Name="MainShell"
+            Margin="36"
             Background="{StaticResource SurfaceBrush}"
             BorderBrush="#C9D4E2"
             BorderThickness="1"
@@ -274,7 +286,7 @@
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
-            <Border Grid.Column="0" Background="#F8FAFD" BorderBrush="#DCE5F0" BorderThickness="0,0,1,0" CornerRadius="14,0,0,14">
+            <Border Grid.Column="0" Background="{StaticResource PanelBrush}" BorderBrush="#DCE5F0" BorderThickness="0,0,1,0" CornerRadius="14,0,0,14">
                 <Grid Margin="0,32,0,30">
                     <Grid.RowDefinitions>
                         <RowDefinition Height="92" />
@@ -546,7 +558,8 @@
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Settings}">
-                        <StackPanel Width="820" HorizontalAlignment="Center" Margin="0,32,0,0">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Width="860" HorizontalAlignment="Center" Margin="0,32,0,32">
                             <TextBlock Text="设置" FontSize="42" FontWeight="Black" Foreground="{StaticResource TextBrush}" Margin="0,18,0,28" />
                             <Border Style="{StaticResource Card}" Margin="0,0,0,22">
                                 <StackPanel>
@@ -567,6 +580,87 @@
                                     <CheckBox x:Name="AutoConnectCheckBox" Content="启动后自动连接" Margin="0,8" Click="SettingsCheckBox_Click" />
                                     <Border Height="1" Background="{StaticResource LineBrush}" />
                                     <CheckBox x:Name="MinimizeToTrayCheckBox" Content="最小化到托盘" Margin="0,8" Click="SettingsCheckBox_Click" />
+                                    <Border Height="1" Background="{StaticResource LineBrush}" />
+                                    <CheckBox x:Name="DarkModeCheckBox" Content="暗色模式" Margin="0,8" Click="SettingsCheckBox_Click" />
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                                <StackPanel>
+                                    <Grid Margin="0,0,0,18">
+                                        <TextBlock Text="路由规则" FontSize="21" FontWeight="Bold" VerticalAlignment="Center" />
+                                        <Button Content="应用网络设置" Style="{StaticResource OutlineButton}" Width="150" Height="42" HorizontalAlignment="Right" Click="ApplyNetworkSettings_Click" />
+                                    </Grid>
+                                    <Grid Margin="0,0,0,16">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="140" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <TextBlock Text="规则模板" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <ComboBox x:Name="RoutingRuleModeComboBox" Grid.Column="1" Height="44" FontSize="16" SelectionChanged="AdvancedSettings_Changed">
+                                            <ComboBoxItem Content="智能规则：大陆与私有地址直连，其余走代理" />
+                                            <ComboBoxItem Content="白名单：仅自定义代理列表走代理，其余直连" />
+                                            <ComboBoxItem Content="黑名单：自定义阻止列表拦截，其他按规则处理" />
+                                        </ComboBox>
+                                    </Grid>
+                                    <CheckBox x:Name="BypassMainlandCheckBox" Content="绕过大陆地址和大陆域名" Margin="0,0,0,16" Click="AdvancedSettings_Changed" />
+                                    <UniformGrid Columns="2" Rows="3">
+                                        <StackPanel Margin="0,0,10,12">
+                                            <TextBlock Text="直连域名" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="DirectDomainsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" ToolTip="每行一个，例如 domain:example.cn 或 geosite:cn" />
+                                        </StackPanel>
+                                        <StackPanel Margin="10,0,0,12">
+                                            <TextBlock Text="直连 IP" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="DirectIpsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" ToolTip="每行一个，例如 192.168.0.0/16 或 geoip:private" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,10,12">
+                                            <TextBlock Text="代理域名 / 白名单" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="ProxyDomainsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" ToolTip="每行一个，例如 domain:google.com 或 geosite:geolocation-!cn" />
+                                        </StackPanel>
+                                        <StackPanel Margin="10,0,0,12">
+                                            <TextBlock Text="代理 IP / 白名单" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="ProxyIpsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" ToolTip="每行一个，例如 8.8.8.8 或 1.1.1.0/24" />
+                                        </StackPanel>
+                                        <StackPanel Margin="0,0,10,0">
+                                            <TextBlock Text="阻止域名 / 黑名单" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="BlockDomainsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" ToolTip="每行一个，例如 geosite:category-ads-all" />
+                                        </StackPanel>
+                                        <StackPanel Margin="10,0,0,0">
+                                            <TextBlock Text="阻止 IP / 黑名单" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,8" />
+                                            <TextBox x:Name="BlockIpsTextBox" Style="{StaticResource MultiLineTextBox}" TextChanged="AdvancedTextBox_TextChanged" />
+                                        </StackPanel>
+                                    </UniformGrid>
+                                </StackPanel>
+                            </Border>
+
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,22">
+                                <StackPanel>
+                                    <TextBlock Text="DNS 设置" FontSize="21" FontWeight="Bold" Margin="0,0,0,18" />
+                                    <UniformGrid Columns="3" Margin="0,0,0,16">
+                                        <CheckBox x:Name="EnableCustomDnsCheckBox" Content="自定义 DNS" Click="AdvancedSettings_Changed" />
+                                        <CheckBox x:Name="EnableFakeDnsCheckBox" Content="FakeDNS" Click="AdvancedSettings_Changed" />
+                                        <CheckBox x:Name="EnableSplitDnsCheckBox" Content="国内外分流" Click="AdvancedSettings_Changed" />
+                                    </UniformGrid>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="128" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="58" />
+                                            <RowDefinition Height="58" />
+                                            <RowDefinition Height="58" />
+                                            <RowDefinition Height="58" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="国内 DNS:" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox x:Name="DomesticDnsTextBox" Grid.Column="1" TextChanged="AdvancedTextBox_TextChanged" />
+                                        <TextBlock Grid.Row="1" Text="国外 DNS:" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox x:Name="ForeignDnsTextBox" Grid.Row="1" Grid.Column="1" TextChanged="AdvancedTextBox_TextChanged" />
+                                        <TextBlock Grid.Row="2" Text="DoH:" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox x:Name="DohDnsTextBox" Grid.Row="2" Grid.Column="1" TextChanged="AdvancedTextBox_TextChanged" />
+                                        <TextBlock Grid.Row="3" Text="DoT:" FontSize="17" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                        <TextBox x:Name="DotDnsTextBox" Grid.Row="3" Grid.Column="1" TextChanged="AdvancedTextBox_TextChanged" />
+                                    </Grid>
                                 </StackPanel>
                             </Border>
 
@@ -600,6 +694,7 @@
                                 </Grid>
                             </Border>
                         </StackPanel>
+                        </ScrollViewer>
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Logs}">
