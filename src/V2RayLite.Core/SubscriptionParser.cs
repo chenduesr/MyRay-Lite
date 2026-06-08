@@ -6,7 +6,20 @@ namespace V2RayLite.Core;
 
 public sealed class SubscriptionParser
 {
-    private static readonly string[] SupportedSchemes = ["vmess://", "vless://", "trojan://", "ss://", "socks://", "http://", "https://"];
+    private static readonly string[] SupportedSchemes =
+    [
+        "vmess://",
+        "vless://",
+        "trojan://",
+        "ss://",
+        "socks://",
+        "http://",
+        "https://",
+        "hysteria2://",
+        "hy2://",
+        "tuic://",
+        "anytls://"
+    ];
 
     public IReadOnlyList<ProxyNode> Parse(string payload)
     {
@@ -122,6 +135,21 @@ public sealed class SubscriptionParser
             return ParseUriNode(line, ProtocolType.Http);
         }
 
+        if (line.StartsWith("hysteria2://", StringComparison.OrdinalIgnoreCase) || line.StartsWith("hy2://", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParseUriNode(line, ProtocolType.Hysteria2);
+        }
+
+        if (line.StartsWith("tuic://", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParseUriNode(line, ProtocolType.Tuic);
+        }
+
+        if (line.StartsWith("anytls://", StringComparison.OrdinalIgnoreCase))
+        {
+            return ParseUriNode(line, ProtocolType.AnyTls);
+        }
+
         return null;
     }
 
@@ -179,7 +207,8 @@ public sealed class SubscriptionParser
         var query = ParseQuery(uri.Query);
         var name = CleanName(string.IsNullOrWhiteSpace(uri.Fragment) ? null : Uri.UnescapeDataString(uri.Fragment), uri.Host);
         var network = GetQuery(query, "type", "tcp") ?? "tcp";
-        var security = GetQuery(query, "security", protocol == ProtocolType.Trojan ? "tls" : "none") ?? "none";
+        var defaultSecurity = protocol is ProtocolType.Trojan or ProtocolType.Hysteria2 or ProtocolType.AnyTls ? "tls" : "none";
+        var security = GetQuery(query, "security", defaultSecurity) ?? defaultSecurity;
 
         string? username = null;
         string? password = null;
@@ -189,8 +218,14 @@ public sealed class SubscriptionParser
             username = parts[0];
             password = parts.Length == 2 ? parts[1] : null;
         }
+        else if (protocol == ProtocolType.Tuic && !string.IsNullOrWhiteSpace(user))
+        {
+            var parts = user.Split(':', 2);
+            username = parts[0];
+            password = parts.Length == 2 ? parts[1] : GetQuery(query, "password");
+        }
 
-        return new ProxyNode
+        var node = new ProxyNode
         {
             Id = StableId(line),
             Raw = line,
@@ -199,19 +234,31 @@ public sealed class SubscriptionParser
             Address = uri.Host,
             Port = uri.Port,
             UserId = protocol == ProtocolType.Vless ? user : username,
-            Password = protocol is ProtocolType.Trojan ? user : password,
+            Password = protocol is ProtocolType.Trojan or ProtocolType.Hysteria2 or ProtocolType.AnyTls ? user : password,
             Network = network,
             Security = security,
             Flow = GetQuery(query, "flow"),
             Host = GetQuery(query, "host"),
             Path = GetQuery(query, "path"),
-            ServiceName = GetQuery(query, "serviceName"),
-            Sni = GetQuery(query, "sni", GetQuery(query, "peer")),
-            Fingerprint = GetQuery(query, "fp"),
-            PublicKey = GetQuery(query, "pbk"),
-            ShortId = GetQuery(query, "sid"),
-            SpiderX = GetQuery(query, "spx")
+            ServiceName = GetQuery(query, "serviceName", GetQuery(query, "grpc-service-name")),
+            Sni = GetQuery(query, "sni", GetQuery(query, "peer", GetQuery(query, "servername"))),
+            Fingerprint = GetQuery(query, "fp", GetQuery(query, "fingerprint", GetQuery(query, "client-fingerprint"))),
+            PublicKey = GetQuery(query, "pbk", GetQuery(query, "public-key")),
+            ShortId = GetQuery(query, "sid", GetQuery(query, "short-id")),
+            SpiderX = GetQuery(query, "spx", GetQuery(query, "spider-x")),
+            Alpn = GetQuery(query, "alpn"),
+            Obfs = GetQuery(query, "obfs", GetQuery(query, "obfs-type")),
+            ObfsPassword = GetQuery(query, "obfs-password", GetQuery(query, "obfs_password")),
+            CongestionControl = GetQuery(query, "congestion-control"),
+            AllowInsecure = IsTrue(GetQuery(query, "allowInsecure", GetQuery(query, "insecure")))
         };
+
+        if (protocol == ProtocolType.Tuic)
+        {
+            node.UnsupportedReason = "已解析 TUIC 节点，但当前 Xray-core 不支持 TUIC 出站；可等待后续 sing-box 核心支持。";
+        }
+
+        return node;
     }
 
     private static ProxyNode? ParseShadowsocks(string line)
@@ -368,7 +415,22 @@ public sealed class SubscriptionParser
             "shadowsocks" => ProtocolType.Shadowsocks,
             "socks5" => ProtocolType.Socks,
             "http" => ProtocolType.Http,
+            "hysteria2" => ProtocolType.Hysteria2,
+            "hy2" => ProtocolType.Hysteria2,
+            "tuic" => ProtocolType.Tuic,
+            "anytls" => ProtocolType.AnyTls,
             _ => ProtocolType.Unknown
+        };
+
+        var hasReality = !string.IsNullOrWhiteSpace(GetMap(map, "public-key", GetMap(map, "pbk")));
+        var tlsEnabled = IsTrue(GetMap(map, "tls"))
+            || protocol is ProtocolType.Trojan or ProtocolType.Hysteria2 or ProtocolType.AnyTls;
+        var security = hasReality ? "reality" : tlsEnabled ? "tls" : GetMap(map, "security", "none") ?? "none";
+        var unsupportedReason = protocol switch
+        {
+            ProtocolType.Unknown => $"Xray 暂不支持 Clash 节点类型：{type}",
+            ProtocolType.Tuic => "已解析 TUIC 节点，但当前 Xray-core 不支持 TUIC 出站；可等待后续 sing-box 核心支持。",
+            _ => null
         };
 
         var node = new ProxyNode
@@ -385,13 +447,24 @@ public sealed class SubscriptionParser
             AlterId = int.TryParse(GetMap(map, "alterId", GetMap(map, "alter-id")), out var alterId) ? alterId : 0,
             VmessSecurity = GetMap(map, "security", "auto"),
             Network = GetMap(map, "network", "tcp") ?? "tcp",
-            Security = IsTrue(GetMap(map, "tls")) ? "tls" : "none",
+            Security = security,
             Sni = GetMap(map, "servername", GetMap(map, "sni")),
             Host = GetMap(map, "Host", GetMap(map, "host")),
-            Path = GetMap(map, "path"),
+            Path = GetMap(map, "path", GetMap(map, "ws-path")),
+            ServiceName = GetMap(map, "grpc-service-name", GetMap(map, "service-name")),
+            Fingerprint = GetMap(map, "client-fingerprint", GetMap(map, "fingerprint")),
+            PublicKey = GetMap(map, "public-key", GetMap(map, "pbk")),
+            ShortId = GetMap(map, "short-id", GetMap(map, "sid")),
+            SpiderX = GetMap(map, "spider-x", GetMap(map, "spx")),
+            Alpn = GetMap(map, "alpn"),
+            Obfs = GetMap(map, "obfs", GetMap(map, "obfs-type")),
+            ObfsPassword = GetMap(map, "obfs-password", GetMap(map, "obfs_password")),
+            CongestionControl = GetMap(map, "congestion-control"),
+            AllowInsecure = IsTrue(GetMap(map, "skip-cert-verify", GetMap(map, "allowInsecure", GetMap(map, "insecure")))),
             UnsupportedReason = protocol == ProtocolType.Unknown ? $"Xray 暂不支持 Clash 节点类型：{type}" : null
         };
 
+        node.UnsupportedReason = unsupportedReason ?? node.UnsupportedReason;
         return node;
     }
 
@@ -408,6 +481,47 @@ public sealed class SubscriptionParser
         if (!string.IsNullOrWhiteSpace(key) && !string.IsNullOrWhiteSpace(value))
         {
             map[key] = value;
+            AddInlineYamlObject(map, value);
+        }
+    }
+
+    private static void AddInlineYamlObject(Dictionary<string, string> map, string value)
+    {
+        var trimmed = value.Trim();
+        if (!trimmed.StartsWith('{') || !trimmed.EndsWith('}'))
+        {
+            return;
+        }
+
+        foreach (var part in SplitInlineYaml(trimmed[1..^1]))
+        {
+            AddYamlKeyValue(map, part);
+        }
+    }
+
+    private static IEnumerable<string> SplitInlineYaml(string value)
+    {
+        var depth = 0;
+        var start = 0;
+        for (var index = 0; index < value.Length; index++)
+        {
+            depth += value[index] switch
+            {
+                '{' => 1,
+                '}' => -1,
+                _ => 0
+            };
+
+            if (value[index] == ',' && depth == 0)
+            {
+                yield return value[start..index].Trim();
+                start = index + 1;
+            }
+        }
+
+        if (start < value.Length)
+        {
+            yield return value[start..].Trim();
         }
     }
 

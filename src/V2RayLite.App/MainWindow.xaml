@@ -38,6 +38,18 @@
             <Setter Property="TextAlignment" Value="Center" />
         </Style>
 
+        <Style x:Key="PageTitleText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="40" />
+            <Setter Property="FontWeight" Value="Bold" />
+            <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
+            <Setter Property="LineHeight" Value="62" />
+            <Setter Property="Padding" Value="8,0,0,0" />
+            <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+            <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
+            <Setter Property="TextOptions.TextRenderingMode" Value="ClearType" />
+        </Style>
+
         <Style x:Key="WindowButton" TargetType="Button">
             <Setter Property="Width" Value="44" />
             <Setter Property="Height" Value="36" />
@@ -67,8 +79,8 @@
 
         <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Height" Value="58" />
-            <Setter Property="Margin" Value="24,4" />
-            <Setter Property="Padding" Value="20,0" />
+            <Setter Property="Margin" Value="18,4" />
+            <Setter Property="Padding" Value="16,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -282,7 +294,7 @@
 
         <Grid>
             <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="260" />
+                <ColumnDefinition Width="220" />
                 <ColumnDefinition Width="*" />
             </Grid.ColumnDefinitions>
 
@@ -294,11 +306,11 @@
                         <RowDefinition Height="128" />
                     </Grid.RowDefinitions>
 
-                    <StackPanel Orientation="Horizontal" Margin="28,0,0,0" VerticalAlignment="Top">
+                    <StackPanel Orientation="Horizontal" Margin="24,0,0,0" VerticalAlignment="Top">
                         <Border Width="42" Height="42" CornerRadius="10" Background="{StaticResource BlueBrush}">
                             <TextBlock Text="M" FontSize="27" FontWeight="Bold" Foreground="White" HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
-                        <TextBlock Text="MyRay Lite" Margin="14,6,0,0" FontSize="24" FontWeight="Bold" Foreground="{StaticResource BlueBrush}" VerticalAlignment="Top" />
+                        <TextBlock Text="MyRay Lite" Margin="12,6,0,0" FontSize="22" FontWeight="Bold" Foreground="{StaticResource BlueBrush}" VerticalAlignment="Top" />
                     </StackPanel>
 
                     <StackPanel Grid.Row="1" Margin="0,18,0,0">
@@ -334,7 +346,7 @@
                         </Button>
                     </StackPanel>
 
-                    <StackPanel Grid.Row="2" Margin="28,0">
+                    <StackPanel Grid.Row="2" Margin="24,0">
                         <Border Height="1" Background="#DDE6F1" Margin="0,0,0,20" />
                         <Grid Margin="0,0,0,20">
                             <Grid.ColumnDefinitions>
@@ -370,7 +382,7 @@
                     <Button Style="{StaticResource WindowButton}" Content="×" Click="Close_Click" FontSize="22" />
                 </StackPanel>
 
-                <Grid Grid.Row="1" Margin="44,0,44,36">
+                <Grid Grid.Row="1" Margin="44,0,36,36">
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Home}">
                         <Grid HorizontalAlignment="Center" Width="760">
                             <Grid.RowDefinitions>
@@ -379,7 +391,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="系统代理" FontSize="44" FontWeight="Black" Foreground="{StaticResource TextBrush}" TextAlignment="Center" Margin="0,46,0,22" />
+                            <TextBlock Text="系统代理" Style="{StaticResource PageTitleText}" TextAlignment="Center" Margin="0,38,0,22" />
                             <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,28">
                                 <TextBlock Text="当前状态：" FontSize="21" Foreground="{StaticResource TextBrush}" />
                                 <TextBlock Text="{Binding RuntimeStatus}" FontSize="21" FontWeight="Bold" Foreground="{Binding RuntimeStatusBrush}" Margin="18,0,0,0" />
@@ -442,7 +454,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="节点列表" FontSize="42" FontWeight="Black" Foreground="{StaticResource TextBrush}" Margin="0,20,0,28" />
+                            <TextBlock Text="节点列表" Style="{StaticResource PageTitleText}" Margin="0,10,0,24" />
                             <Grid Grid.Row="1" Margin="0,0,0,22">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
@@ -450,9 +462,9 @@
                                     <ColumnDefinition Width="170" />
                                 </Grid.ColumnDefinitions>
                                 <Grid>
-                                    <TextBox x:Name="SearchTextBox" TextChanged="SearchTextBox_TextChanged" Height="54" FontSize="17" Padding="48,0,16,0" />
-                                    <TextBlock Style="{StaticResource IconText}" Text="&#xE721;" Foreground="#718096" HorizontalAlignment="Left" Width="48" />
-                                    <TextBlock Text="搜索节点（名称、地址、备注）" IsHitTestVisible="False" Margin="48,0,0,0" VerticalAlignment="Center" Foreground="#9AA6B2" FontSize="17" Visibility="{Binding IsSearchEmpty, Converter={StaticResource BoolVisibilityConverter}}" />
+                                    <TextBox x:Name="SearchTextBox" TextChanged="SearchTextBox_TextChanged" Height="54" FontSize="17" Padding="64,0,16,0" />
+                                    <TextBlock Style="{StaticResource IconText}" Text="&#xE721;" Foreground="#718096" HorizontalAlignment="Left" Width="48" Margin="14,0,0,0" />
+                                    <TextBlock Text="搜索节点（名称、地址、备注）" IsHitTestVisible="False" Margin="64,0,0,0" VerticalAlignment="Center" Foreground="#9AA6B2" FontSize="17" Visibility="{Binding IsSearchEmpty, Converter={StaticResource BoolVisibilityConverter}}" />
                                 </Grid>
                                 <Button Grid.Column="1" Style="{StaticResource GhostButton}" Height="54" Margin="18,0,0,0" Click="RefreshNodes_Click">
                                     <TextBlock Style="{StaticResource IconText}" Text="&#xE72C;" Foreground="{StaticResource BlueBrush}" />
@@ -469,22 +481,22 @@
                                                     <Border CornerRadius="8" Background="White" MinHeight="68" Margin="0,0,0,2">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
-                                                                <ColumnDefinition Width="34" />
-                                                                <ColumnDefinition Width="48" />
+                                                                <ColumnDefinition Width="30" />
+                                                                <ColumnDefinition Width="50" />
                                                                 <ColumnDefinition Width="*" />
+                                                                <ColumnDefinition Width="126" />
                                                                 <ColumnDefinition Width="118" />
-                                                                <ColumnDefinition Width="124" />
-                                                                <ColumnDefinition Width="34" />
+                                                                <ColumnDefinition Width="28" />
                                                             </Grid.ColumnDefinitions>
                                                             <Ellipse Width="10" Height="10" Fill="{Binding Status, Converter={x:Static local:NodeStatusBrushConverter.Instance}}" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                                            <Border Grid.Column="1" Width="36" Height="36" Background="#F0F5FB" CornerRadius="18" VerticalAlignment="Center" HorizontalAlignment="Center">
-                                                                <TextBlock Text="{Binding Name, Converter={x:Static local:FlagTextConverter.Instance}}" FontSize="15" FontWeight="Bold" Foreground="{StaticResource BlueBrush}" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                                            <Border Grid.Column="1" Width="38" Height="38" Background="#F0F5FB" CornerRadius="19" VerticalAlignment="Center" HorizontalAlignment="Center">
+                                                                <Image Source="{Binding Name, Converter={x:Static local:FlagImageConverter.Instance}}" Width="30" Height="30" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                             </Border>
                                                             <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" HorizontalContentAlignment="Left" Padding="4,0" Click="CopyNode_Click" Tag="{Binding Id}">
                                                                 <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
                                                             </Button>
-                                                            <TextBlock Grid.Column="3" Text="{Binding DisplayDelay}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                                            <Button Grid.Column="4" Height="40" Width="104" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" Style="{StaticResource OutlineButton}" FontSize="16" />
+                                                            <TextBlock Grid.Column="3" Text="{Binding DisplayDelay}" ToolTip="{Binding UnsupportedReason}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
+                                                            <Button Grid.Column="4" Height="40" Width="100" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" IsEnabled="{Binding IsSupportedByXray}" ToolTip="{Binding UnsupportedReason}" Style="{StaticResource OutlineButton}" FontSize="16" />
                                                             <TextBlock Grid.Column="5" Style="{StaticResource IconText}" Text="&#xE76C;" Foreground="#B7C2D0" FontSize="18" />
                                                             <Border Grid.Column="1" Grid.ColumnSpan="5" Height="1" Background="#EEF2F7" VerticalAlignment="Bottom" />
                                                         </Grid>
@@ -505,7 +517,7 @@
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Subscription}">
                         <StackPanel Width="640" HorizontalAlignment="Center" Margin="0,44,0,0">
-                            <TextBlock Text="订阅管理" FontSize="44" FontWeight="Black" Foreground="{StaticResource TextBrush}" TextAlignment="Center" Margin="0,24,0,38" />
+                            <TextBlock Text="订阅管理" Style="{StaticResource PageTitleText}" TextAlignment="Center" Margin="0,16,0,32" />
                             <Border Style="{StaticResource Card}" Margin="0,0,0,28">
                                 <StackPanel>
                                     <TextBlock Text="订阅地址" FontSize="20" FontWeight="Bold" Foreground="{StaticResource TextBrush}" Margin="0,0,0,16" />
@@ -558,9 +570,14 @@
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Settings}">
-                        <ScrollViewer VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
-                        <StackPanel Width="860" HorizontalAlignment="Center" Margin="0,32,0,32">
-                            <TextBlock Text="设置" FontSize="42" FontWeight="Black" Foreground="{StaticResource TextBrush}" Margin="0,18,0,28" />
+                        <Grid Width="860" HorizontalAlignment="Center" Margin="0,10,0,0">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="86" />
+                                <RowDefinition Height="*" />
+                            </Grid.RowDefinitions>
+                            <TextBlock Text="设置" Style="{StaticResource PageTitleText}" Margin="0,0,0,16" />
+                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                        <StackPanel Margin="0,0,0,32">
                             <Border Style="{StaticResource Card}" Margin="0,0,0,22">
                                 <StackPanel>
                                     <TextBlock Text="代理模式" FontSize="21" FontWeight="Bold" Margin="0,0,0,24" />
@@ -694,7 +711,8 @@
                                 </Grid>
                             </Border>
                         </StackPanel>
-                        </ScrollViewer>
+                            </ScrollViewer>
+                        </Grid>
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Logs}">
@@ -704,7 +722,7 @@
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="日志诊断" FontSize="42" FontWeight="Black" Foreground="{StaticResource TextBrush}" Margin="0,18,0,24" />
+                            <TextBlock Text="日志诊断" Style="{StaticResource PageTitleText}" Margin="0,10,0,20" />
                             <Grid Grid.Row="1" Margin="0,0,0,18">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />

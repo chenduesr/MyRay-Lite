@@ -22,6 +22,9 @@ public enum ProtocolType
     Shadowsocks,
     Socks,
     Http,
+    Hysteria2,
+    Tuic,
+    AnyTls,
     Unknown
 }
 
@@ -45,6 +48,9 @@ public sealed class AppSettings
     public int HttpPort { get; set; } = 7890;
     public int SocksPort { get; set; } = 7891;
     public string DelayTestUrl { get; set; } = "http://www.gstatic.com/generate_204";
+    public int DelayTestBatchSize { get; set; } = 40;
+    public int DelayTestRetryBatchSize { get; set; } = 8;
+    public int DelayTestTimeoutSeconds { get; set; } = 10;
     public bool BypassMainland { get; set; } = true;
     public string DirectDomains { get; set; } = string.Empty;
     public string DirectIps { get; set; } = string.Empty;
@@ -85,6 +91,11 @@ public sealed class ProxyNode
     public string? PublicKey { get; set; }
     public string? ShortId { get; set; }
     public string? SpiderX { get; set; }
+    public string? Alpn { get; set; }
+    public string? Obfs { get; set; }
+    public string? ObfsPassword { get; set; }
+    public string? CongestionControl { get; set; }
+    public bool AllowInsecure { get; set; }
     public int AlterId { get; set; }
     public string? VmessSecurity { get; set; }
     public string? UnsupportedReason { get; set; }
@@ -98,7 +109,9 @@ public sealed class ProxyNode
         or ProtocolType.Trojan
         or ProtocolType.Shadowsocks
         or ProtocolType.Socks
-        or ProtocolType.Http;
+        or ProtocolType.Http
+        or ProtocolType.Hysteria2
+        or ProtocolType.AnyTls;
 
     public string DisplayDelay => Status switch
     {

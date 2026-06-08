@@ -78,6 +78,75 @@ public sealed class XrayConfigBuilder
         return config.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
     }
 
+    public string BuildBatchDelayTest(IReadOnlyList<ProxyNode> nodes, IReadOnlyList<int> httpPorts)
+    {
+        if (nodes.Count != httpPorts.Count)
+        {
+            throw new ArgumentException("Node and port counts must match.");
+        }
+
+        var inbounds = new JsonArray();
+        var outbounds = new JsonArray();
+        var rules = new JsonArray();
+
+        for (var index = 0; index < nodes.Count; index++)
+        {
+            var node = nodes[index];
+            if (!node.IsSupportedByXray)
+            {
+                throw new NotSupportedException(node.UnsupportedReason ?? $"Xray 暂不支持协议：{node.Protocol}");
+            }
+
+            var inboundTag = $"probe-in-{index}";
+            var outboundTag = $"probe-out-{index}";
+
+            inbounds.Add(new JsonObject
+            {
+                ["tag"] = inboundTag,
+                ["listen"] = "127.0.0.1",
+                ["port"] = httpPorts[index],
+                ["protocol"] = "http",
+                ["settings"] = new JsonObject { ["timeout"] = 0 }
+            });
+
+            var outbound = BuildProxyOutbound(node);
+            outbound["tag"] = outboundTag;
+            outbounds.Add(outbound);
+
+            rules.Add(new JsonObject
+            {
+                ["type"] = "field",
+                ["inboundTag"] = new JsonArray(inboundTag),
+                ["outboundTag"] = outboundTag
+            });
+        }
+
+        outbounds.Add(BuildDirectOutbound("direct"));
+        outbounds.Add(new JsonObject
+        {
+            ["tag"] = "block",
+            ["protocol"] = "blackhole",
+            ["settings"] = new JsonObject()
+        });
+
+        var config = new JsonObject
+        {
+            ["log"] = new JsonObject
+            {
+                ["loglevel"] = "warning"
+            },
+            ["inbounds"] = inbounds,
+            ["outbounds"] = outbounds,
+            ["routing"] = new JsonObject
+            {
+                ["domainStrategy"] = "AsIs",
+                ["rules"] = rules
+            }
+        };
+
+        return config.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+    }
+
     private static JsonObject BuildProxyOutbound(ProxyNode node)
     {
         return node.Protocol switch
@@ -88,6 +157,8 @@ public sealed class XrayConfigBuilder
             ProtocolType.Shadowsocks => BuildShadowsocks(node),
             ProtocolType.Socks => BuildSocks(node),
             ProtocolType.Http => BuildHttp(node),
+            ProtocolType.Hysteria2 => BuildHysteria2(node),
+            ProtocolType.AnyTls => BuildAnyTls(node),
             _ => throw new InvalidOperationException($"Unsupported protocol: {node.Protocol}")
         };
     }
@@ -255,6 +326,69 @@ public sealed class XrayConfigBuilder
         };
     }
 
+    private static JsonObject BuildHysteria2(ProxyNode node)
+    {
+        var server = new JsonObject
+        {
+            ["address"] = node.Address,
+            ["port"] = node.Port,
+            ["password"] = node.Password
+        };
+        AddIfNotEmpty(server, "email", node.UserId);
+        AddIfNotEmpty(server, "obfs", node.Obfs);
+        AddIfNotEmpty(server, "obfsPassword", node.ObfsPassword);
+
+        var outbound = new JsonObject
+        {
+            ["tag"] = "proxy",
+            ["protocol"] = "hysteria2",
+            ["settings"] = new JsonObject
+            {
+                ["servers"] = new JsonArray { server }
+            }
+        };
+
+        return AddTlsSettings(node, outbound);
+    }
+
+    private static JsonObject BuildAnyTls(ProxyNode node)
+    {
+        var server = new JsonObject
+        {
+            ["address"] = node.Address,
+            ["port"] = node.Port,
+            ["password"] = node.Password
+        };
+
+        var outbound = new JsonObject
+        {
+            ["tag"] = "proxy",
+            ["protocol"] = "anytls",
+            ["settings"] = new JsonObject
+            {
+                ["servers"] = new JsonArray { server }
+            }
+        };
+
+        return AddTlsSettings(node, outbound);
+    }
+
+    private static JsonObject AddTlsSettings(ProxyNode node, JsonObject outbound)
+    {
+        var tls = new JsonObject { ["allowInsecure"] = node.AllowInsecure };
+        AddIfNotEmpty(tls, "serverName", node.Sni);
+        AddIfNotEmpty(tls, "fingerprint", node.Fingerprint);
+        AddAlpn(tls, node.Alpn);
+
+        outbound["streamSettings"] = new JsonObject
+        {
+            ["security"] = "tls",
+            ["tlsSettings"] = tls
+        };
+
+        return outbound;
+    }
+
     private static JsonObject AddStreamSettings(ProxyNode node, JsonObject outbound)
     {
         var stream = new JsonObject
@@ -277,9 +411,10 @@ public sealed class XrayConfigBuilder
             }
             else
             {
-                var tls = new JsonObject { ["allowInsecure"] = false };
+                var tls = new JsonObject { ["allowInsecure"] = node.AllowInsecure };
                 AddIfNotEmpty(tls, "serverName", node.Sni);
                 AddIfNotEmpty(tls, "fingerprint", node.Fingerprint);
+                AddAlpn(tls, node.Alpn);
                 stream["tlsSettings"] = tls;
             }
         }
@@ -474,5 +609,18 @@ public sealed class XrayConfigBuilder
         {
             target[key] = value;
         }
+    }
+
+    private static void AddAlpn(JsonObject target, string? value)
+    {
+        if (string.IsNullOrWhiteSpace(value))
+        {
+            return;
+        }
+
+        target["alpn"] = new JsonArray(value
+            .Split([',', ';', ' '], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries)
+            .Select(item => JsonValue.Create(item))
+            .ToArray());
     }
 }

@@ -447,7 +447,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             });
         });
         await _store.SaveNodesAsync(_nodes);
-        ToastMessage = "测速完成。";
+        var available = _nodes.Count(node => node.Status == NodeStatus.Available);
+        var unavailable = _nodes.Count(node => node.Status == NodeStatus.Unavailable);
+        var unsupported = _nodes.Count(node => !node.IsSupportedByXray);
+        ToastMessage = unsupported > 0
+            ? $"测速完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
+            : $"测速完成：可用 {available}，不可用 {unavailable}。";
         RefreshLogLines();
     }
 
@@ -811,10 +816,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void SetBrush(string key, string color)
     {
+        var next = new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString(color));
         if (Resources[key] is MediaSolidColorBrush brush)
         {
-            brush.Color = (MediaColor)MediaColorConverter.ConvertFromString(color);
+            if (!brush.IsFrozen)
+            {
+                brush.Color = next.Color;
+                return;
+            }
         }
+
+        Resources[key] = next;
     }
 
     private void BeginIntroAnimation()
