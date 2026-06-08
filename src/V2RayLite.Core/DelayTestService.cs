@@ -8,7 +8,9 @@ public sealed class DelayTestService
 {
     private const int BatchSize = 40;
     private const int RetryBatchSize = 8;
+    private const int TcpProbeConcurrency = 80;
     private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
+    private static readonly TimeSpan TcpProbeTimeout = TimeSpan.FromSeconds(3);
 
     private readonly AppPaths _paths;
     private readonly XrayConfigBuilder _configBuilder;
@@ -31,6 +33,14 @@ public sealed class DelayTestService
         }
 
         var exe = Path.Combine(_paths.FindXrayDirectory(), "xray.exe");
+        var tcpDelay = await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken);
+        if (tcpDelay is not null)
+        {
+            _log.Info($"快速 TCP 延迟：{node.Name}，{tcpDelay}ms");
+            return tcpDelay;
+        }
+
+        _log.Warn($"快速 TCP 延迟失败，切换到真实代理测速：{node.Name}");
         if (!File.Exists(exe))
         {
             _log.Error("测速失败：未找到 xray.exe。");
@@ -107,13 +117,8 @@ public sealed class DelayTestService
             return;
         }
 
-        _log.Info($"开始批量测速：{supportedNodes.Count} 个节点，每批 {BatchSize} 个。");
-        foreach (var batch in supportedNodes.Chunk(BatchSize))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await RunBatchDelayTestAsync(batch, testUrl, DefaultTimeout, onNodeUpdated, cancellationToken);
-        }
-
+        _log.Info($"开始快速 TCP 批量测速：{supportedNodes.Count} 个节点。");
+        await RunTcpBatchDelayTestAsync(supportedNodes, onNodeUpdated, cancellationToken);
         var retryNodes = supportedNodes
             .Where(node => node.Status == NodeStatus.Unavailable)
             .ToList();
@@ -124,7 +129,7 @@ public sealed class DelayTestService
             return;
         }
 
-        _log.Info($"开始失败重试：{retryNodes.Count} 个节点，每批 {RetryBatchSize} 个。");
+        _log.Info($"开始真实代理失败重试：{retryNodes.Count} 个节点，每批 {RetryBatchSize} 个。");
         foreach (var node in retryNodes)
         {
             node.DelayMs = null;
@@ -137,6 +142,32 @@ public sealed class DelayTestService
             cancellationToken.ThrowIfCancellationRequested();
             await RunBatchDelayTestAsync(batch, testUrl, DefaultTimeout, onNodeUpdated, cancellationToken);
         }
+    }
+
+    private static async Task RunTcpBatchDelayTestAsync(
+        IReadOnlyList<ProxyNode> nodes,
+        Action<ProxyNode>? onNodeUpdated,
+        CancellationToken cancellationToken)
+    {
+        using var gate = new SemaphoreSlim(TcpProbeConcurrency);
+        var tasks = nodes.Select(async node =>
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                var delay = await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken);
+                node.DelayMs = delay;
+                node.Status = delay is null ? NodeStatus.Unavailable : NodeStatus.Available;
+                node.LastTested = DateTimeOffset.Now;
+                onNodeUpdated?.Invoke(node);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
     }
 
     private async Task RunBatchDelayTestAsync(
@@ -245,6 +276,30 @@ public sealed class DelayTestService
 
         var ok = response.IsSuccessStatusCode || (int)response.StatusCode is >= 200 and < 500;
         return ok ? (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue) : null;
+    }
+
+    private static async Task<int?> TestTcpConnectDelayAsync(
+        ProxyNode node,
+        TimeSpan timeout,
+        CancellationToken cancellationToken)
+    {
+        if (string.IsNullOrWhiteSpace(node.Address) || node.Port <= 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            using var client = new TcpClient();
+            var stopwatch = Stopwatch.StartNew();
+            await client.ConnectAsync(node.Address, node.Port, cancellationToken).AsTask().WaitAsync(timeout, cancellationToken);
+            stopwatch.Stop();
+            return (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue);
+        }
+        catch
+        {
+            return null;
+        }
     }
 
     private static Process StartXray(string exe, string configFile, string logFile)

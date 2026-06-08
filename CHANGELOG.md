@@ -1,5 +1,36 @@
 # Changelog
 
+## v1.4.0
+
+### Release And Installer
+
+- Updated the Windows installer script to version `1.4.0`.
+- The installer now creates a Start Menu shortcut by default.
+- The installer can optionally create a desktop shortcut.
+- The installer now includes an uninstall shortcut in the Start Menu group.
+- GitHub Actions Release now uploads both the portable zip package and the Setup installer.
+- Release notes in GitHub Actions were rewritten with clean Chinese Markdown.
+
+### Auto Update Check
+
+- Added an in-app GitHub Release update checker.
+- The Settings page now shows the current app version.
+- Clicking "检查更新" checks the latest GitHub Release and opens the download page when a newer version is available.
+
+### UI Polish
+
+- Added sortable node list headers for node name, delay, and status.
+- Improved node list row colors for better dark mode consistency.
+- Moved Toast messages to a top-right floating panel.
+- Improved empty node states for both "no subscription nodes" and "no search results".
+- Tightened Settings page card spacing for a more compact layout.
+
+### Delay Test
+
+- Added a fast TCP handshake delay pass before the heavier real-proxy HTTP probe.
+- Batch tests now show delay values closer to common clients such as v2rayN.
+- Nodes that fail the fast TCP pass still fall back to the temporary Xray real-proxy test.
+
 ## v1.3.0
 
 ### Delay Test Stability

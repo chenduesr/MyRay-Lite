@@ -3,6 +3,7 @@ using System.ComponentModel;
 using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
@@ -30,6 +31,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly SystemProxyService _systemProxyService = new();
     private readonly DelayTestService _delayTestService;
     private readonly XrayDownloadService _downloadService;
+    private readonly UpdateCheckService _updateCheckService;
     private readonly ObservableCollection<ProxyNode> _nodes = [];
     private readonly WinForms.NotifyIcon _notifyIcon;
 
@@ -39,11 +41,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _toastMessage = string.Empty;
     private string _subscriptionStatus = "未更新";
     private string _searchText = string.Empty;
+    private string _nodeSortKey = "Status";
+    private bool _nodeSortAscending;
     private bool _isApplyingSettings;
     private WinForms.ToolStripMenuItem? _trayStatusItem;
     private WinForms.ToolStripMenuItem? _trayNodeItem;
     private WinForms.ToolStripMenuItem? _trayToggleItem;
     private WinForms.ToolStripMenuItem? _traySwitchNodeItem;
+    private string? _latestReleaseUrl;
 
     public MainWindow()
     {
@@ -58,6 +63,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _xrayService = new XrayProcessService(_paths, configBuilder, _log);
         _delayTestService = new DelayTestService(_paths, configBuilder, _log);
         _downloadService = new XrayDownloadService(httpClient, _paths);
+        _updateCheckService = new UpdateCheckService(httpClient, _log);
         _notifyIcon = CreateNotifyIcon();
 
         Opacity = 0;
@@ -109,6 +115,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool HasNodes => FilteredNodes.Count > 0;
     public bool HasLogs => LogLines.Count > 0;
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
+    public string AppVersionText => $"v{GetCurrentVersion()}";
+    public string EmptyNodesTitle => _nodes.Count == 0 ? "暂无节点" : "没有匹配节点";
+    public string EmptyNodesMessage => _nodes.Count == 0 ? "请在订阅页保存并更新订阅" : "换个关键词，或点击刷新重新加载列表";
     public string LastUpdateText => _settings.LastSubscriptionUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
 
     public string SubscriptionStatus
@@ -135,8 +144,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             _toastMessage = value;
             Notify();
+            Notify(nameof(HasToast));
         }
     }
+
+    public bool HasToast => !string.IsNullOrWhiteSpace(_toastMessage);
 
     public MediaBrush HomeNavBackground => NavBackground("Home");
     public MediaBrush NodesNavBackground => NavBackground("Nodes");
@@ -480,6 +492,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ToastMessage = "节点列表已刷新。";
     }
 
+    private void SortNodes_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is not WpfButton { Tag: string sortKey })
+        {
+            return;
+        }
+
+        if (string.Equals(_nodeSortKey, sortKey, StringComparison.OrdinalIgnoreCase))
+        {
+            _nodeSortAscending = !_nodeSortAscending;
+        }
+        else
+        {
+            _nodeSortKey = sortKey;
+            _nodeSortAscending = sortKey != "Status";
+        }
+
+        RefreshFilteredNodes();
+    }
+
     private void CopyNode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is WpfButton { Tag: string nodeId })
@@ -656,6 +688,34 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!string.IsNullOrWhiteSpace(_latestReleaseUrl))
+            {
+                Process.Start(new ProcessStartInfo { FileName = _latestReleaseUrl, UseShellExecute = true });
+                return;
+            }
+
+            ToastMessage = "正在检查更新...";
+            var result = await _updateCheckService.CheckLatestAsync(GetCurrentVersion());
+            _latestReleaseUrl = result.HasUpdate ? result.ReleaseUrl : null;
+            ToastMessage = result.Message;
+
+            if (result.HasUpdate && !string.IsNullOrWhiteSpace(result.ReleaseUrl))
+            {
+                Process.Start(new ProcessStartInfo { FileName = result.ReleaseUrl, UseShellExecute = true });
+            }
+        }
+        catch (Exception ex)
+        {
+            ToastMessage = $"检查更新失败：{ex.Message}";
+            _log.Error(ToastMessage);
+            RefreshLogLines();
+        }
+    }
+
     private void RefreshLogs_Click(object sender, RoutedEventArgs e)
     {
         RefreshLogLines();
@@ -730,7 +790,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void RefreshFilteredNodes()
     {
         FilteredNodes.Clear();
-        foreach (var node in _nodes.Where(MatchesSearch))
+        foreach (var node in SortNodes(_nodes.Where(MatchesSearch)))
         {
             FilteredNodes.Add(node);
         }
@@ -738,6 +798,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Notify(nameof(FilteredNodes));
         Notify(nameof(HasNodes));
         Notify(nameof(NodeCount));
+        Notify(nameof(EmptyNodesTitle));
+        Notify(nameof(EmptyNodesMessage));
+    }
+
+    private IEnumerable<ProxyNode> SortNodes(IEnumerable<ProxyNode> nodes)
+    {
+        return _nodeSortKey switch
+        {
+            "Name" => _nodeSortAscending
+                ? nodes.OrderBy(node => node.Name, StringComparer.CurrentCultureIgnoreCase)
+                : nodes.OrderByDescending(node => node.Name, StringComparer.CurrentCultureIgnoreCase),
+            "Delay" => _nodeSortAscending
+                ? nodes.OrderBy(node => node.DelayMs ?? int.MaxValue)
+                : nodes.OrderByDescending(node => node.DelayMs ?? -1),
+            _ => _nodeSortAscending
+                ? nodes.OrderBy(node => node.Status).ThenBy(node => node.DelayMs ?? int.MaxValue)
+                : nodes.OrderByDescending(node => node.Status).ThenBy(node => node.DelayMs ?? int.MaxValue)
+        };
     }
 
     private void RefreshLogLines()
@@ -874,6 +952,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private static string TruncateTrayText(string value)
     {
         return value.Length <= 63 ? value : value[..60] + "...";
+    }
+
+    private static Version GetCurrentVersion()
+    {
+        return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
     }
 
     private void Notify([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)

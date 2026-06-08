@@ -46,13 +46,25 @@ jobs:
           Get-ChildItem -Path $extract -Recurse -Include xray.exe,geoip.dat,geosite.dat |
             Copy-Item -Destination publish/MyRay-Lite-win-x64/bin/xray -Force
 
-      - name: Create zip
+      - name: Create portable zip
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Force -Path release | Out-Null
           Compress-Archive -Path publish/MyRay-Lite-win-x64/* `
             -DestinationPath "release/MyRay-Lite-${{ github.ref_name }}-win-x64.zip" `
             -CompressionLevel Optimal
+
+      - name: Install Inno Setup
+        shell: pwsh
+        run: choco install innosetup --yes --no-progress
+
+      - name: Build setup installer
+        shell: pwsh
+        run: |
+          $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+          if (-not (Test-Path $iscc)) { $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe" }
+          if (-not (Test-Path $iscc)) { throw "ISCC.exe not found." }
+          & $iscc installer/MyRay-Lite.iss
 
       - name: Upload GitHub Release
         uses: softprops/action-gh-release@v2
@@ -61,30 +73,20 @@ jobs:
           body: |
             ## MyRay Lite ${{ github.ref_name }}
 
-            ### 下载说明
+            Windows x64 版本，提供两种下载：
 
-            - Windows x64 便携版。
-            - 下载 zip 后解压，运行 `MyRayLite.exe` 即可。
-            - 已包含 Xray-core、`geoip.dat`、`geosite.dat`。
+            - 便携版：下载 zip 后解压，运行 `MyRayLite.exe`
+            - 安装版：下载 Setup.exe，自动创建开始菜单快捷方式，可选择桌面快捷方式
 
-            ### 本次变化
+            ### 本次重点
 
-            - 删除 `external/v2rayN`。
-            - 删除 `.gitmodules`。
-            - 项目不再包含、引用、编译、调用 v2rayN 代码。
-            - `LICENSE` 改为 MIT。
-            - README/第三方声明已改成只说明 Xray-core。
-
-            ### 新增/增强
-
-            - 更完整订阅解析：常见链接 + Base64 + 简单 Clash YAML。
-            - 真实代理延迟测试：临时启动 Xray，通过本地 HTTP 代理访问测速 URL。
-            - 批量测速并发限制为 3，避免卡死。
-            - 新增“日志诊断”页面：可刷新、清空、打开日志目录。
-            - Xray stdout/stderr 实时写入日志文件。
-            - 正式 app 图标：`Assets/app.ico`。
-            - Inno Setup 安装脚本：`installer/MyRay-Lite.iss`。
-            - GitHub Actions 自动 Release：`.github/workflows/release.yml`。
+            - 批量测速支持分批执行和失败重试。
+            - 支持 Hysteria2、AnyTLS、TUIC 订阅解析。
+            - Reality 和 Clash YAML 参数兼容增强。
+            - 节点列表、空状态、Toast、暗色模式继续优化。
+            - 应用内支持检查 GitHub 最新版本。
 
             完整变更记录见 `CHANGELOG.md`。
-          files: release/*.zip
+          files: |
+            release/*.zip
+            release/*.exe
