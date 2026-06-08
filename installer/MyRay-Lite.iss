@@ -21,9 +21,6 @@ ArchitecturesInstallIn64BitMode=x64
 SetupIconFile=..\src\V2RayLite.App\Assets\app.ico
 UninstallDisplayIcon={app}\{#MyAppExeName}
 
-[Languages]
-Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
-
 [Tasks]
 Name: "desktopicon"; Description: "创建桌面快捷方式"; GroupDescription: "附加图标："; Flags: checkedonce
 
