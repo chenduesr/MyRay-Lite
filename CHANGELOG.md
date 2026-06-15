@@ -1,5 +1,34 @@
 # Changelog
 
+## v1.5.0
+
+### Speed Test
+
+- Added explicit speed test modes: TCP latency, HTTP proxy latency, and download speed.
+- Download mode now reads test data through the temporary Xray proxy and displays `MB/s`.
+- Batch HTTP/download tests still use one temporary Xray process with multiple local ports.
+- Failed nodes now keep a failure category and readable reason for UI tooltip and diagnostics.
+- Retry logic now focuses on timeout and connection failures instead of blindly retrying every failure.
+
+### Diagnostics
+
+- Added a diagnostics service for core file checks, HTTP/SOCKS port occupancy, geo data files, and active node config generation.
+- Added Xray error advice for occupied ports, invalid config, unsupported protocol, missing geo files, and Reality parameter issues.
+- Xray startup failures now surface a clearer repair suggestion instead of a generic failure message.
+
+### UI Polish
+
+- Settings page now includes a speed test mode selector.
+- Logs page now includes a one-click diagnostics button.
+- Node delay cells show the current test type and expose detailed failure reasons in tooltips.
+- Empty/error guidance and Toast copy were tightened around testing and diagnostics.
+
+### Release And License
+
+- Updated app and installer version to `1.5.0`.
+- Release notes now mention installer, portable package, test modes, diagnostics, and update checking.
+- Project license changed from MIT to GPL-3.0.
+
 ## v1.4.0
 
 ### Release And Installer

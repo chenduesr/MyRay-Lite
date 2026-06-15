@@ -36,6 +36,36 @@ public enum NodeStatus
     Testing
 }
 
+public enum DelayTestMode
+{
+    Tcp,
+    Http,
+    Download
+}
+
+public enum DelayFailureKind
+{
+    None,
+    UnsupportedProtocol,
+    MissingCore,
+    PortUnavailable,
+    XrayConfigInvalid,
+    XrayStartupFailed,
+    TcpTimeout,
+    HttpTimeout,
+    DownloadTimeout,
+    ConnectionFailed,
+    InvalidResponse,
+    Unknown
+}
+
+public enum DiagnosticSeverity
+{
+    Info,
+    Warning,
+    Error
+}
+
 public sealed class AppSettings
 {
     public string SubscriptionUrl { get; set; } = string.Empty;
@@ -48,9 +78,11 @@ public sealed class AppSettings
     public int HttpPort { get; set; } = 7890;
     public int SocksPort { get; set; } = 7891;
     public string DelayTestUrl { get; set; } = "http://www.gstatic.com/generate_204";
+    public DelayTestMode DelayTestMode { get; set; } = DelayTestMode.Tcp;
     public int DelayTestBatchSize { get; set; } = 40;
     public int DelayTestRetryBatchSize { get; set; } = 8;
     public int DelayTestTimeoutSeconds { get; set; } = 10;
+    public int DelayDownloadBytes { get; set; } = 1048576;
     public bool BypassMainland { get; set; } = true;
     public string DirectDomains { get; set; } = string.Empty;
     public string DirectIps { get; set; } = string.Empty;
@@ -100,6 +132,10 @@ public sealed class ProxyNode
     public string? VmessSecurity { get; set; }
     public string? UnsupportedReason { get; set; }
     public int? DelayMs { get; set; }
+    public double? DownloadMbps { get; set; }
+    public DelayFailureKind LastFailureKind { get; set; } = DelayFailureKind.None;
+    public string? LastFailureReason { get; set; }
+    public DelayTestMode LastDelayTestMode { get; set; } = DelayTestMode.Tcp;
     public NodeStatus Status { get; set; } = NodeStatus.Unknown;
     public DateTimeOffset? LastTested { get; set; }
     public bool IsActive { get; set; }
@@ -115,11 +151,38 @@ public sealed class ProxyNode
 
     public string DisplayDelay => Status switch
     {
+        NodeStatus.Available when DownloadMbps is not null && LastDelayTestMode == DelayTestMode.Download => $"{DownloadMbps:0.0} MB/s",
         NodeStatus.Available when DelayMs is not null => $"{DelayMs}ms",
         NodeStatus.Unavailable => "不可用",
         NodeStatus.Testing => "测试中",
         _ => "—"
     };
+
+    public string DisplayTestType => LastDelayTestMode switch
+    {
+        DelayTestMode.Tcp => "TCP",
+        DelayTestMode.Http => "HTTP",
+        DelayTestMode.Download => "下载",
+        _ => "测速"
+    };
+
+    public string DisplayFailureReason => LastFailureReason
+        ?? UnsupportedReason
+        ?? LastFailureKind switch
+        {
+            DelayFailureKind.UnsupportedProtocol => $"Xray 暂不支持协议：{Protocol}",
+            DelayFailureKind.MissingCore => "未找到 xray.exe，请先下载核心",
+            DelayFailureKind.PortUnavailable => "临时测速端口不可用",
+            DelayFailureKind.XrayConfigInvalid => "Xray 配置生成失败",
+            DelayFailureKind.XrayStartupFailed => "Xray 测速进程启动失败",
+            DelayFailureKind.TcpTimeout => "TCP 连接超时",
+            DelayFailureKind.HttpTimeout => "HTTP 测速超时",
+            DelayFailureKind.DownloadTimeout => "下载测速超时",
+            DelayFailureKind.ConnectionFailed => "无法连接节点",
+            DelayFailureKind.InvalidResponse => "测速地址响应异常",
+            DelayFailureKind.Unknown => "未知错误",
+            _ => string.Empty
+        };
 }
 
 public sealed class SubscriptionSnapshot
@@ -145,5 +208,25 @@ public sealed class LogEntry
     public override string ToString()
     {
         return $"[{Timestamp:yyyy-MM-dd HH:mm:ss}] [{Level}] {Message}";
+    }
+}
+
+public sealed class DiagnosticIssue
+{
+    public DiagnosticSeverity Severity { get; set; }
+    public string Title { get; set; } = string.Empty;
+    public string Detail { get; set; } = string.Empty;
+    public string Suggestion { get; set; } = string.Empty;
+
+    public override string ToString()
+    {
+        var level = Severity switch
+        {
+            DiagnosticSeverity.Error => "错误",
+            DiagnosticSeverity.Warning => "警告",
+            _ => "提示"
+        };
+
+        return $"[{level}] {Title}：{Detail} 建议：{Suggestion}";
     }
 }

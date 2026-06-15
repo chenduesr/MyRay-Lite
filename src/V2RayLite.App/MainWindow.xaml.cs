@@ -30,6 +30,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly XrayProcessService _xrayService;
     private readonly SystemProxyService _systemProxyService = new();
     private readonly DelayTestService _delayTestService;
+    private readonly DiagnosticsService _diagnosticsService;
     private readonly XrayDownloadService _downloadService;
     private readonly UpdateCheckService _updateCheckService;
     private readonly ObservableCollection<ProxyNode> _nodes = [];
@@ -62,6 +63,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _subscriptionService = new SubscriptionService(httpClient, new SubscriptionParser(), _store);
         _xrayService = new XrayProcessService(_paths, configBuilder, _log);
         _delayTestService = new DelayTestService(_paths, configBuilder, _log);
+        _diagnosticsService = new DiagnosticsService(_paths, configBuilder);
         _downloadService = new XrayDownloadService(httpClient, _paths);
         _updateCheckService = new UpdateCheckService(httpClient, _log);
         _notifyIcon = CreateNotifyIcon();
@@ -119,6 +121,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string EmptyNodesTitle => _nodes.Count == 0 ? "暂无节点" : "没有匹配节点";
     public string EmptyNodesMessage => _nodes.Count == 0 ? "请在订阅页保存并更新订阅" : "换个关键词，或点击刷新重新加载列表";
     public string LastUpdateText => _settings.LastSubscriptionUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
+    public string DelayTestModeText => _settings.DelayTestMode switch
+    {
+        DelayTestMode.Tcp => "TCP 延迟",
+        DelayTestMode.Http => "HTTP 延迟",
+        DelayTestMode.Download => "下载测速",
+        _ => "TCP 延迟"
+    };
 
     public string SubscriptionStatus
     {
@@ -222,6 +231,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ForeignDnsTextBox.Text = _settings.ForeignDns;
         DohDnsTextBox.Text = _settings.DohDns;
         DotDnsTextBox.Text = _settings.DotDns;
+        DelayTestModeComboBox.SelectedIndex = _settings.DelayTestMode switch
+        {
+            DelayTestMode.Http => 1,
+            DelayTestMode.Download => 2,
+            _ => 0
+        };
         _isApplyingSettings = false;
     }
 
@@ -450,7 +465,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void TestAllNodes_Click(object sender, RoutedEventArgs e)
     {
         ToastMessage = "正在测速...";
-        await _delayTestService.TestManyAsync(_nodes, _settings.DelayTestUrl, _ =>
+        await _delayTestService.TestManyAsync(_nodes, _settings, _ =>
         {
             Dispatcher.Invoke(() =>
             {
@@ -463,8 +478,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var unavailable = _nodes.Count(node => node.Status == NodeStatus.Unavailable);
         var unsupported = _nodes.Count(node => !node.IsSupportedByXray);
         ToastMessage = unsupported > 0
-            ? $"测速完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
-            : $"测速完成：可用 {available}，不可用 {unavailable}。";
+            ? $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
+            : $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}。";
         RefreshLogLines();
     }
 
@@ -474,15 +489,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
         RefreshStatusProperties();
 
-        var delay = await _delayTestService.TestProxyDelayAsync(node, _settings.DelayTestUrl, TimeSpan.FromSeconds(10));
-        node.DelayMs = delay;
-        node.Status = delay is null ? NodeStatus.Unavailable : NodeStatus.Available;
-        node.LastTested = DateTimeOffset.Now;
+        var delay = await _delayTestService.TestProxyDelayAsync(node, _settings);
         await _store.SaveNodesAsync(_nodes);
 
         RefreshFilteredNodes();
         RefreshStatusProperties();
-        ToastMessage = delay is null ? "节点不可用。" : $"延迟 {delay}ms。";
+        ToastMessage = delay is null ? $"节点不可用：{node.DisplayFailureReason}" : $"{node.DisplayTestType} {node.DisplayDelay}。";
         RefreshLogLines();
     }
 
@@ -663,6 +675,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await _store.SaveSettingsAsync(_settings);
     }
 
+    private async void DelayTestModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded || _isApplyingSettings)
+        {
+            return;
+        }
+
+        _settings.DelayTestMode = DelayTestModeComboBox.SelectedIndex switch
+        {
+            1 => DelayTestMode.Http,
+            2 => DelayTestMode.Download,
+            _ => DelayTestMode.Tcp
+        };
+
+        if (_settings.DelayTestMode == DelayTestMode.Download &&
+            (string.IsNullOrWhiteSpace(DelayTestUrlTextBox.Text) || DelayTestUrlTextBox.Text.Contains("generate_204", StringComparison.OrdinalIgnoreCase)))
+        {
+            DelayTestUrlTextBox.Text = "https://speed.cloudflare.com/__down?bytes=1048576";
+            _settings.DelayTestUrl = DelayTestUrlTextBox.Text;
+        }
+
+        await _store.SaveSettingsAsync(_settings);
+        Notify(nameof(DelayTestModeText));
+        ToastMessage = $"测速模式已切换为 {DelayTestModeText}。";
+    }
+
     private void SearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _searchText = SearchTextBox.Text.Trim();
@@ -737,6 +775,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             FileName = _paths.LogDirectory,
             UseShellExecute = true
         });
+    }
+
+    private void RunDiagnostics_Click(object sender, RoutedEventArgs e)
+    {
+        var issues = _diagnosticsService.Run(_settings, ActiveNode);
+        foreach (var issue in issues)
+        {
+            var level = issue.Severity == DiagnosticSeverity.Error
+                ? "ERROR"
+                : issue.Severity == DiagnosticSeverity.Warning ? "WARN" : "INFO";
+            _log.Write(level, issue.ToString());
+        }
+
+        RefreshLogLines();
+        var errors = issues.Count(issue => issue.Severity == DiagnosticSeverity.Error);
+        var warnings = issues.Count(issue => issue.Severity == DiagnosticSeverity.Warning);
+        ToastMessage = errors > 0
+            ? $"诊断完成：发现 {errors} 个错误，{warnings} 个警告。"
+            : warnings > 0 ? $"诊断完成：发现 {warnings} 个警告。" : "诊断通过，未发现明显问题。";
     }
 
     private void Minimize_Click(object sender, RoutedEventArgs e)
@@ -859,6 +916,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Notify(nameof(ProxyModeText));
         Notify(nameof(NodeCount));
         Notify(nameof(LastUpdateText));
+        Notify(nameof(DelayTestModeText));
         UpdateTrayMenu();
     }
 

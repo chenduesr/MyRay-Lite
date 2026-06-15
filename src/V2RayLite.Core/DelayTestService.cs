@@ -6,10 +6,7 @@ namespace V2RayLite.Core;
 
 public sealed class DelayTestService
 {
-    private const int BatchSize = 40;
-    private const int RetryBatchSize = 8;
     private const int TcpProbeConcurrency = 80;
-    private static readonly TimeSpan DefaultTimeout = TimeSpan.FromSeconds(10);
     private static readonly TimeSpan TcpProbeTimeout = TimeSpan.FromSeconds(3);
 
     private readonly AppPaths _paths;
@@ -23,28 +20,123 @@ public sealed class DelayTestService
         _log = log;
     }
 
-    public async Task<int?> TestProxyDelayAsync(ProxyNode node, string testUrl, TimeSpan timeout, CancellationToken cancellationToken = default)
+    public async Task<int?> TestProxyDelayAsync(ProxyNode node, AppSettings settings, CancellationToken cancellationToken = default)
     {
-        if (!node.IsSupportedByXray)
+        ResetNodeForTest(node, settings.DelayTestMode);
+
+        if (!PrepareSupportedNode(node))
         {
-            node.UnsupportedReason ??= $"Xray 暂不支持协议：{node.Protocol}";
-            _log.Warn($"跳过不支持节点：{node.Name}，{node.UnsupportedReason}");
             return null;
         }
 
-        var exe = Path.Combine(_paths.FindXrayDirectory(), "xray.exe");
-        var tcpDelay = await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken);
-        if (tcpDelay is not null)
+        var result = settings.DelayTestMode == DelayTestMode.Tcp
+            ? await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken)
+            : await TestWithTemporaryXrayAsync(node, settings, cancellationToken);
+
+        ApplyResult(node, result);
+        return node.DelayMs;
+    }
+
+    public async Task TestManyAsync(IEnumerable<ProxyNode> nodes, AppSettings settings, Action<ProxyNode>? onNodeUpdated = null, CancellationToken cancellationToken = default)
+    {
+        var nodeList = nodes.ToList();
+        var supportedNodes = new List<ProxyNode>();
+
+        foreach (var node in nodeList)
         {
-            _log.Info($"快速 TCP 延迟：{node.Name}，{tcpDelay}ms");
-            return tcpDelay;
+            cancellationToken.ThrowIfCancellationRequested();
+            ResetNodeForTest(node, settings.DelayTestMode);
+
+            if (!PrepareSupportedNode(node))
+            {
+                onNodeUpdated?.Invoke(node);
+                continue;
+            }
+
+            node.Status = NodeStatus.Testing;
+            supportedNodes.Add(node);
+            onNodeUpdated?.Invoke(node);
         }
 
-        _log.Warn($"快速 TCP 延迟失败，切换到真实代理测速：{node.Name}");
+        if (supportedNodes.Count == 0)
+        {
+            return;
+        }
+
+        if (settings.DelayTestMode == DelayTestMode.Tcp)
+        {
+            _log.Info($"开始 TCP 批量测速：{supportedNodes.Count} 个节点，并发 {TcpProbeConcurrency}。");
+            await RunTcpBatchDelayTestAsync(supportedNodes, onNodeUpdated, cancellationToken);
+            return;
+        }
+
+        var batchSize = Math.Clamp(settings.DelayTestBatchSize, 1, 80);
+        _log.Info($"开始 {FormatMode(settings.DelayTestMode)} 批量测速：{supportedNodes.Count} 个节点，每批 {batchSize} 个。");
+
+        foreach (var batch in supportedNodes.Chunk(batchSize))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await RunXrayBatchDelayTestAsync(batch, settings, onNodeUpdated, cancellationToken);
+        }
+
+        var retryNodes = supportedNodes
+            .Where(node => node.Status == NodeStatus.Unavailable && node.LastFailureKind is DelayFailureKind.HttpTimeout or DelayFailureKind.DownloadTimeout or DelayFailureKind.ConnectionFailed)
+            .ToList();
+
+        if (retryNodes.Count == 0)
+        {
+            return;
+        }
+
+        var retryBatchSize = Math.Clamp(settings.DelayTestRetryBatchSize, 1, 20);
+        _log.Info($"开始失败重试：{retryNodes.Count} 个节点，每批 {retryBatchSize} 个。");
+        foreach (var node in retryNodes)
+        {
+            ResetNodeForTest(node, settings.DelayTestMode);
+            node.Status = NodeStatus.Testing;
+            onNodeUpdated?.Invoke(node);
+        }
+
+        foreach (var batch in retryNodes.Chunk(retryBatchSize))
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            await RunXrayBatchDelayTestAsync(batch, settings, onNodeUpdated, cancellationToken);
+        }
+    }
+
+    private static async Task RunTcpBatchDelayTestAsync(
+        IReadOnlyList<ProxyNode> nodes,
+        Action<ProxyNode>? onNodeUpdated,
+        CancellationToken cancellationToken)
+    {
+        using var gate = new SemaphoreSlim(TcpProbeConcurrency);
+        var tasks = nodes.Select(async node =>
+        {
+            await gate.WaitAsync(cancellationToken);
+            try
+            {
+                var result = await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken);
+                ApplyResult(node, result);
+                onNodeUpdated?.Invoke(node);
+            }
+            finally
+            {
+                gate.Release();
+            }
+        });
+
+        await Task.WhenAll(tasks);
+    }
+
+    private async Task<ProbeResult> TestWithTemporaryXrayAsync(
+        ProxyNode node,
+        AppSettings settings,
+        CancellationToken cancellationToken)
+    {
+        var exe = Path.Combine(_paths.FindXrayDirectory(), "xray.exe");
         if (!File.Exists(exe))
         {
-            _log.Error("测速失败：未找到 xray.exe。");
-            return null;
+            return ProbeResult.Fail(DelayFailureKind.MissingCore, "未找到 xray.exe，请先下载核心。");
         }
 
         var httpPort = GetFreeTcpPort();
@@ -69,16 +161,20 @@ public sealed class DelayTestService
 
             if (process.HasExited)
             {
-                _log.Warn($"测速 Xray 启动失败：{node.Name}");
-                return null;
+                var issue = XrayErrorAdvisor.Analyze(ReadFileTail(logFile));
+                return ProbeResult.Fail(DelayFailureKind.XrayStartupFailed, $"{issue.Title}：{issue.Suggestion}");
             }
 
-            return await ProbeThroughHttpPortAsync(node, httpPort, testUrl, timeout, cancellationToken);
+            return await ProbeThroughHttpPortAsync(httpPort, settings, cancellationToken);
+        }
+        catch (NotSupportedException ex)
+        {
+            return ProbeResult.Fail(DelayFailureKind.UnsupportedProtocol, ex.Message);
         }
         catch (Exception ex)
         {
-            _log.Warn($"节点测速失败：{node.Name}，{ex.Message}");
-            return null;
+            var issue = XrayErrorAdvisor.Analyze(ex.Message);
+            return ProbeResult.Fail(DelayFailureKind.XrayConfigInvalid, $"{issue.Title}：{issue.Suggestion}");
         }
         finally
         {
@@ -87,101 +183,16 @@ public sealed class DelayTestService
         }
     }
 
-    public async Task TestManyAsync(IEnumerable<ProxyNode> nodes, string testUrl, Action<ProxyNode>? onNodeUpdated = null, CancellationToken cancellationToken = default)
-    {
-        var nodeList = nodes.ToList();
-        var supportedNodes = new List<ProxyNode>();
-
-        foreach (var node in nodeList)
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            node.DelayMs = null;
-            node.LastTested = DateTimeOffset.Now;
-
-            if (!node.IsSupportedByXray)
-            {
-                node.UnsupportedReason ??= $"Xray 暂不支持协议：{node.Protocol}";
-                node.Status = NodeStatus.Unavailable;
-                onNodeUpdated?.Invoke(node);
-                _log.Warn($"跳过不支持节点：{node.Name}，{node.UnsupportedReason}");
-                continue;
-            }
-
-            node.Status = NodeStatus.Testing;
-            supportedNodes.Add(node);
-            onNodeUpdated?.Invoke(node);
-        }
-
-        if (supportedNodes.Count == 0)
-        {
-            return;
-        }
-
-        _log.Info($"开始快速 TCP 批量测速：{supportedNodes.Count} 个节点。");
-        await RunTcpBatchDelayTestAsync(supportedNodes, onNodeUpdated, cancellationToken);
-        var retryNodes = supportedNodes
-            .Where(node => node.Status == NodeStatus.Unavailable)
-            .ToList();
-
-        if (retryNodes.Count == 0)
-        {
-            _log.Info("批量测速完成，没有需要重试的节点。");
-            return;
-        }
-
-        _log.Info($"开始真实代理失败重试：{retryNodes.Count} 个节点，每批 {RetryBatchSize} 个。");
-        foreach (var node in retryNodes)
-        {
-            node.DelayMs = null;
-            node.Status = NodeStatus.Testing;
-            onNodeUpdated?.Invoke(node);
-        }
-
-        foreach (var batch in retryNodes.Chunk(RetryBatchSize))
-        {
-            cancellationToken.ThrowIfCancellationRequested();
-            await RunBatchDelayTestAsync(batch, testUrl, DefaultTimeout, onNodeUpdated, cancellationToken);
-        }
-    }
-
-    private static async Task RunTcpBatchDelayTestAsync(
+    private async Task RunXrayBatchDelayTestAsync(
         IReadOnlyList<ProxyNode> nodes,
-        Action<ProxyNode>? onNodeUpdated,
-        CancellationToken cancellationToken)
-    {
-        using var gate = new SemaphoreSlim(TcpProbeConcurrency);
-        var tasks = nodes.Select(async node =>
-        {
-            await gate.WaitAsync(cancellationToken);
-            try
-            {
-                var delay = await TestTcpConnectDelayAsync(node, TcpProbeTimeout, cancellationToken);
-                node.DelayMs = delay;
-                node.Status = delay is null ? NodeStatus.Unavailable : NodeStatus.Available;
-                node.LastTested = DateTimeOffset.Now;
-                onNodeUpdated?.Invoke(node);
-            }
-            finally
-            {
-                gate.Release();
-            }
-        });
-
-        await Task.WhenAll(tasks);
-    }
-
-    private async Task RunBatchDelayTestAsync(
-        IReadOnlyList<ProxyNode> nodes,
-        string testUrl,
-        TimeSpan timeout,
+        AppSettings settings,
         Action<ProxyNode>? onNodeUpdated,
         CancellationToken cancellationToken)
     {
         var exe = Path.Combine(_paths.FindXrayDirectory(), "xray.exe");
         if (!File.Exists(exe))
         {
-            _log.Error("批量测速失败：未找到 xray.exe。");
-            MarkBatchUnavailable(nodes, onNodeUpdated);
+            MarkBatchUnavailable(nodes, DelayFailureKind.MissingCore, "未找到 xray.exe，请先下载核心。", onNodeUpdated);
             return;
         }
 
@@ -199,15 +210,16 @@ public sealed class DelayTestService
 
             if (process.HasExited)
             {
-                _log.Warn("批量测速 Xray 启动失败，请查看日志诊断。");
-                MarkBatchUnavailable(nodes, onNodeUpdated);
+                var issue = XrayErrorAdvisor.Analyze(ReadFileTail(logFile));
+                MarkBatchUnavailable(nodes, DelayFailureKind.XrayStartupFailed, $"{issue.Title}：{issue.Suggestion}", onNodeUpdated);
                 return;
             }
 
+            var timeout = TimeSpan.FromSeconds(Math.Clamp(settings.DelayTestTimeoutSeconds, 3, 60));
             var tasks = nodes.Select((node, index) => TestNodeThroughPortAsync(
                 node,
                 ports[index],
-                testUrl,
+                settings,
                 timeout,
                 onNodeUpdated,
                 cancellationToken));
@@ -216,8 +228,8 @@ public sealed class DelayTestService
         }
         catch (Exception ex)
         {
-            _log.Warn($"批量测速失败：{ex.Message}");
-            MarkBatchUnavailable(nodes.Where(node => node.Status == NodeStatus.Testing), onNodeUpdated);
+            var issue = XrayErrorAdvisor.Analyze(ex.Message);
+            MarkBatchUnavailable(nodes.Where(node => node.Status == NodeStatus.Testing), DelayFailureKind.XrayConfigInvalid, $"{issue.Title}：{issue.Suggestion}", onNodeUpdated);
         }
         finally
         {
@@ -226,40 +238,36 @@ public sealed class DelayTestService
         }
     }
 
-    private async Task TestNodeThroughPortAsync(
+    private static async Task TestNodeThroughPortAsync(
         ProxyNode node,
         int httpPort,
-        string testUrl,
+        AppSettings settings,
         TimeSpan timeout,
         Action<ProxyNode>? onNodeUpdated,
         CancellationToken cancellationToken)
     {
         try
         {
-            var delay = await ProbeThroughHttpPortAsync(node, httpPort, testUrl, timeout, cancellationToken);
-            node.DelayMs = delay;
-            node.Status = delay is null ? NodeStatus.Unavailable : NodeStatus.Available;
+            var result = await ProbeThroughHttpPortAsync(httpPort, settings, cancellationToken, timeout);
+            ApplyResult(node, result);
         }
         catch (Exception ex)
         {
-            _log.Warn($"节点测速失败：{node.Name}，{ex.Message}");
-            node.DelayMs = null;
-            node.Status = NodeStatus.Unavailable;
+            ApplyResult(node, ProbeResult.Fail(DelayFailureKind.Unknown, ex.Message));
         }
         finally
         {
-            node.LastTested = DateTimeOffset.Now;
             onNodeUpdated?.Invoke(node);
         }
     }
 
-    private static async Task<int?> ProbeThroughHttpPortAsync(
-        ProxyNode node,
+    private static async Task<ProbeResult> ProbeThroughHttpPortAsync(
         int httpPort,
-        string testUrl,
-        TimeSpan timeout,
-        CancellationToken cancellationToken)
+        AppSettings settings,
+        CancellationToken cancellationToken,
+        TimeSpan? timeoutOverride = null)
     {
+        var timeout = timeoutOverride ?? TimeSpan.FromSeconds(Math.Clamp(settings.DelayTestTimeoutSeconds, 3, 60));
         var handler = new HttpClientHandler
         {
             Proxy = new WebProxy($"http://127.0.0.1:{httpPort}"),
@@ -267,25 +275,83 @@ public sealed class DelayTestService
         };
 
         using var client = new HttpClient(handler) { Timeout = timeout };
-        using var request = new HttpRequestMessage(HttpMethod.Get, string.IsNullOrWhiteSpace(testUrl) ? "http://www.gstatic.com/generate_204" : testUrl);
+        using var request = new HttpRequestMessage(HttpMethod.Get, NormalizeTestUrl(settings.DelayTestUrl, settings.DelayTestMode));
         request.Headers.UserAgent.ParseAdd("MyRayLite/1.0");
 
         var stopwatch = Stopwatch.StartNew();
-        using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
-        stopwatch.Stop();
+        try
+        {
+            using var response = await client.SendAsync(request, HttpCompletionOption.ResponseHeadersRead, cancellationToken);
+            if (!response.IsSuccessStatusCode && (int)response.StatusCode is < 200 or >= 500)
+            {
+                return ProbeResult.Fail(DelayFailureKind.InvalidResponse, $"测速地址返回 HTTP {(int)response.StatusCode}。");
+            }
 
-        var ok = response.IsSuccessStatusCode || (int)response.StatusCode is >= 200 and < 500;
-        return ok ? (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue) : null;
+            var headerMs = (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue);
+            if (settings.DelayTestMode != DelayTestMode.Download)
+            {
+                return ProbeResult.Success(headerMs, null);
+            }
+
+            var targetBytes = Math.Clamp(settings.DelayDownloadBytes, 128 * 1024, 8 * 1024 * 1024);
+            var bytes = await ReadResponseBytesAsync(response, targetBytes, cancellationToken);
+            stopwatch.Stop();
+
+            if (bytes <= 0)
+            {
+                return ProbeResult.Fail(DelayFailureKind.InvalidResponse, "下载测速没有读取到有效数据。");
+            }
+
+            var seconds = Math.Max(stopwatch.Elapsed.TotalSeconds, 0.001);
+            var megabytesPerSecond = bytes / 1024d / 1024d / seconds;
+            return ProbeResult.Success(headerMs, megabytesPerSecond);
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ProbeResult.Fail(settings.DelayTestMode == DelayTestMode.Download ? DelayFailureKind.DownloadTimeout : DelayFailureKind.HttpTimeout, "测速超时。");
+        }
+        catch (TaskCanceledException)
+        {
+            return ProbeResult.Fail(settings.DelayTestMode == DelayTestMode.Download ? DelayFailureKind.DownloadTimeout : DelayFailureKind.HttpTimeout, "测速超时。");
+        }
+        catch (HttpRequestException ex)
+        {
+            return ProbeResult.Fail(DelayFailureKind.ConnectionFailed, ex.Message);
+        }
+        finally
+        {
+            stopwatch.Stop();
+        }
     }
 
-    private static async Task<int?> TestTcpConnectDelayAsync(
+    private static async Task<int> ReadResponseBytesAsync(HttpResponseMessage response, int targetBytes, CancellationToken cancellationToken)
+    {
+        await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken);
+        var buffer = new byte[32 * 1024];
+        var total = 0;
+
+        while (total < targetBytes)
+        {
+            var read = await stream.ReadAsync(buffer.AsMemory(0, Math.Min(buffer.Length, targetBytes - total)), cancellationToken);
+            if (read == 0)
+            {
+                break;
+            }
+
+            total += read;
+        }
+
+        return total;
+    }
+
+    private static async Task<ProbeResult> TestTcpConnectDelayAsync(
         ProxyNode node,
         TimeSpan timeout,
         CancellationToken cancellationToken)
     {
         if (string.IsNullOrWhiteSpace(node.Address) || node.Port <= 0)
         {
-            return null;
+            return ProbeResult.Fail(DelayFailureKind.ConnectionFailed, "节点地址或端口为空。");
         }
 
         try
@@ -294,13 +360,80 @@ public sealed class DelayTestService
             var stopwatch = Stopwatch.StartNew();
             await client.ConnectAsync(node.Address, node.Port, cancellationToken).AsTask().WaitAsync(timeout, cancellationToken);
             stopwatch.Stop();
-            return (int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue);
+            return ProbeResult.Success((int)Math.Min(stopwatch.ElapsedMilliseconds, int.MaxValue), null);
         }
-        catch
+        catch (TimeoutException)
         {
-            return null;
+            return ProbeResult.Fail(DelayFailureKind.TcpTimeout, "TCP 连接超时。");
+        }
+        catch (OperationCanceledException) when (!cancellationToken.IsCancellationRequested)
+        {
+            return ProbeResult.Fail(DelayFailureKind.TcpTimeout, "TCP 连接超时。");
+        }
+        catch (SocketException ex)
+        {
+            return ProbeResult.Fail(DelayFailureKind.ConnectionFailed, ex.Message);
+        }
+        catch (Exception ex)
+        {
+            return ProbeResult.Fail(DelayFailureKind.ConnectionFailed, ex.Message);
         }
     }
+
+    private static void ResetNodeForTest(ProxyNode node, DelayTestMode mode)
+    {
+        node.DelayMs = null;
+        node.DownloadMbps = null;
+        node.LastDelayTestMode = mode;
+        node.LastFailureKind = DelayFailureKind.None;
+        node.LastFailureReason = null;
+        node.LastTested = DateTimeOffset.Now;
+    }
+
+    private bool PrepareSupportedNode(ProxyNode node)
+    {
+        if (node.IsSupportedByXray)
+        {
+            return true;
+        }
+
+        node.UnsupportedReason ??= $"Xray 暂不支持协议：{node.Protocol}";
+        node.LastFailureKind = DelayFailureKind.UnsupportedProtocol;
+        node.LastFailureReason = node.UnsupportedReason;
+        node.Status = NodeStatus.Unavailable;
+        _log.Warn($"跳过不支持节点：{node.Name}，{node.UnsupportedReason}");
+        return false;
+    }
+
+    private static void ApplyResult(ProxyNode node, ProbeResult result)
+    {
+        node.DelayMs = result.DelayMs;
+        node.DownloadMbps = result.DownloadMbps;
+        node.LastFailureKind = result.FailureKind;
+        node.LastFailureReason = result.FailureReason;
+        node.Status = result.IsSuccess ? NodeStatus.Available : NodeStatus.Unavailable;
+        node.LastTested = DateTimeOffset.Now;
+    }
+
+    private static string NormalizeTestUrl(string? url, DelayTestMode mode)
+    {
+        if (!string.IsNullOrWhiteSpace(url))
+        {
+            return url.Trim();
+        }
+
+        return mode == DelayTestMode.Download
+            ? "https://speed.cloudflare.com/__down?bytes=1048576"
+            : "http://www.gstatic.com/generate_204";
+    }
+
+    private static string FormatMode(DelayTestMode mode) => mode switch
+    {
+        DelayTestMode.Tcp => "TCP",
+        DelayTestMode.Http => "HTTP",
+        DelayTestMode.Download => "下载",
+        _ => "测速"
+    };
 
     private static Process StartXray(string exe, string configFile, string logFile)
     {
@@ -327,12 +460,15 @@ public sealed class DelayTestService
         return process;
     }
 
-    private static void MarkBatchUnavailable(IEnumerable<ProxyNode> nodes, Action<ProxyNode>? onNodeUpdated)
+    private static void MarkBatchUnavailable(IEnumerable<ProxyNode> nodes, DelayFailureKind kind, string reason, Action<ProxyNode>? onNodeUpdated)
     {
         foreach (var node in nodes)
         {
             node.DelayMs = null;
+            node.DownloadMbps = null;
             node.Status = NodeStatus.Unavailable;
+            node.LastFailureKind = kind;
+            node.LastFailureReason = reason;
             node.LastTested = DateTimeOffset.Now;
             onNodeUpdated?.Invoke(node);
         }
@@ -394,6 +530,33 @@ public sealed class DelayTestService
         catch
         {
             // Best effort.
+        }
+    }
+
+    private static string ReadFileTail(string file)
+    {
+        try
+        {
+            return File.Exists(file)
+                ? string.Join(Environment.NewLine, File.ReadLines(file).TakeLast(30))
+                : string.Empty;
+        }
+        catch
+        {
+            return string.Empty;
+        }
+    }
+
+    private readonly record struct ProbeResult(bool IsSuccess, int? DelayMs, double? DownloadMbps, DelayFailureKind FailureKind, string? FailureReason)
+    {
+        public static ProbeResult Success(int delayMs, double? downloadMbps)
+        {
+            return new ProbeResult(true, delayMs, downloadMbps, DelayFailureKind.None, null);
+        }
+
+        public static ProbeResult Fail(DelayFailureKind kind, string reason)
+        {
+            return new ProbeResult(false, null, null, kind, reason);
         }
     }
 }

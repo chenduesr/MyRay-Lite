@@ -512,8 +512,11 @@
                                                             <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" HorizontalContentAlignment="Left" Padding="4,0" Click="CopyNode_Click" Tag="{Binding Id}">
                                                                 <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
                                                             </Button>
-                                                            <TextBlock Grid.Column="3" Text="{Binding DisplayDelay}" ToolTip="{Binding UnsupportedReason}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Center" />
-                                                            <Button Grid.Column="4" Height="40" Width="100" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" IsEnabled="{Binding IsSupportedByXray}" ToolTip="{Binding UnsupportedReason}" Style="{StaticResource OutlineButton}" FontSize="16" />
+                                                            <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="{Binding DisplayFailureReason}">
+                                                                <TextBlock Text="{Binding DisplayDelay}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                                <TextBlock Text="{Binding DisplayTestType}" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                                            </StackPanel>
+                                                            <Button Grid.Column="4" Height="40" Width="100" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" IsEnabled="{Binding IsSupportedByXray}" ToolTip="{Binding DisplayFailureReason}" Style="{StaticResource OutlineButton}" FontSize="16" />
                                                             <TextBlock Grid.Column="5" Style="{StaticResource IconText}" Text="&#xE76C;" Foreground="#B7C2D0" FontSize="18" />
                                                             <Border Grid.Column="1" Grid.ColumnSpan="5" Height="1" Background="{StaticResource LineBrush}" VerticalAlignment="Bottom" />
                                                         </Grid>
@@ -708,6 +711,7 @@
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
+                                        <RowDefinition Height="58" />
                                     </Grid.RowDefinitions>
                                     <TextBlock Text="HTTP:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <TextBox x:Name="HttpPortTextBox" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
@@ -715,6 +719,12 @@
                                     <TextBox x:Name="SocksPortTextBox" Grid.Row="1" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
                                     <TextBlock Grid.Row="2" Text="测速URL:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <TextBox x:Name="DelayTestUrlTextBox" Grid.Row="2" Grid.Column="1" TextChanged="DelayTestUrlTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="3" Text="测速模式:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ComboBox x:Name="DelayTestModeComboBox" Grid.Row="3" Grid.Column="1" Height="46" FontSize="16" SelectionChanged="DelayTestModeComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="TCP 延迟：最快，接近 v2rayN 列表延迟" />
+                                        <ComboBoxItem Content="HTTP 延迟：真实经过 Xray 代理访问测速 URL" />
+                                        <ComboBoxItem Content="下载测速：真实经过 Xray 代理读取 1 MB 数据" />
+                                    </ComboBox>
                                 </Grid>
                             </Border>
 
@@ -750,14 +760,16 @@
                             <Grid Grid.Row="1" Margin="0,0,0,18">
                                 <Grid.ColumnDefinitions>
                                     <ColumnDefinition Width="*" />
-                                    <ColumnDefinition Width="130" />
-                                    <ColumnDefinition Width="130" />
+                                    <ColumnDefinition Width="118" />
+                                    <ColumnDefinition Width="118" />
+                                    <ColumnDefinition Width="118" />
                                     <ColumnDefinition Width="130" />
                                 </Grid.ColumnDefinitions>
                                 <TextBlock Text="显示应用日志、Xray 启动日志和测速诊断。Xray 启动失败时优先看这里。" Foreground="{StaticResource SubtleTextBrush}" FontSize="16" VerticalAlignment="Center" />
                                 <Button Grid.Column="1" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="RefreshLogs_Click" Content="刷新" />
-                                <Button Grid.Column="2" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="ClearLogs_Click" Content="清空" />
-                                <Button Grid.Column="3" Style="{StaticResource PrimaryButton}" Height="44" Margin="12,0,0,0" Click="OpenLogFolder_Click" Content="打开目录" />
+                                <Button Grid.Column="2" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="RunDiagnostics_Click" Content="诊断" />
+                                <Button Grid.Column="3" Style="{StaticResource OutlineButton}" Height="44" Margin="12,0,0,0" Click="ClearLogs_Click" Content="清空" />
+                                <Button Grid.Column="4" Style="{StaticResource PrimaryButton}" Height="44" Margin="12,0,0,0" Click="OpenLogFolder_Click" Content="打开目录" />
                             </Grid>
                             <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="430">
                                 <Grid>

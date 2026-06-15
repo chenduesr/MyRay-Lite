@@ -1,4 +1,6 @@
 using System.Diagnostics;
+using System.Net;
+using System.Net.Sockets;
 
 namespace V2RayLite.Core;
 
@@ -39,6 +41,9 @@ public sealed class XrayProcessService
         await File.WriteAllTextAsync(_paths.GeneratedConfigFile, config, cancellationToken);
         _runtimeLogFile = Path.Combine(_paths.LogDirectory, $"xray-{DateTime.Now:yyyyMMdd-HHmmss}.log");
 
+        EnsurePortAvailable(settings.HttpPort, "HTTP");
+        EnsurePortAvailable(settings.SocksPort, "SOCKS");
+
         _process = new Process
         {
             StartInfo = new ProcessStartInfo
@@ -66,8 +71,9 @@ public sealed class XrayProcessService
         await Task.Delay(800, cancellationToken);
         if (_process.HasExited)
         {
-            _log.Error("Xray 启动失败，请检查节点配置、端口占用或日志页面。");
-            throw new InvalidOperationException("Xray 启动失败，请检查节点配置、端口占用或日志页面。");
+            var issue = XrayErrorAdvisor.Analyze(ReadRuntimeLogTail());
+            _log.Error($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
+            throw new InvalidOperationException($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
         }
 
         return "Xray 已启动";
@@ -115,6 +121,41 @@ public sealed class XrayProcessService
         catch
         {
             // Runtime logging is best effort.
+        }
+    }
+
+    private static void EnsurePortAvailable(int port, string label)
+    {
+        TcpListener? listener = null;
+        try
+        {
+            listener = new TcpListener(IPAddress.Loopback, port);
+            listener.Start();
+        }
+        catch
+        {
+            throw new InvalidOperationException($"{label} 端口 {port} 已被占用，请在设置页更换端口或关闭其他代理软件。");
+        }
+        finally
+        {
+            listener?.Stop();
+        }
+    }
+
+    private string ReadRuntimeLogTail()
+    {
+        try
+        {
+            if (string.IsNullOrWhiteSpace(_runtimeLogFile) || !File.Exists(_runtimeLogFile))
+            {
+                return string.Empty;
+            }
+
+            return string.Join(Environment.NewLine, File.ReadLines(_runtimeLogFile).TakeLast(30));
+        }
+        catch
+        {
+            return string.Empty;
         }
     }
 }
