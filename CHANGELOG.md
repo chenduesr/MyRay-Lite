@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6.2
+
+### UI Fixes
+
+- Fixed the Log Diagnostics toolbar layout so the description text is no longer covered by action buttons.
+- Reworked the log toolbar into a two-line layout with fixed-width, centered buttons.
+- Improved resilience at smaller window widths by allowing the log description to wrap cleanly.
+
 ## v1.6.1
 
 ### UI Fixes
