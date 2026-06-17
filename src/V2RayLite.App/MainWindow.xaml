@@ -899,7 +899,9 @@
                     </Grid>
                 </Border>
 
-                <Grid Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolVisibilityConverter}}"
+                <Grid Grid.RowSpan="2"
+                      Panel.ZIndex="200"
+                      Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolVisibilityConverter}}"
                       Background="#660F172A">
                     <Border x:Name="DialogCard"
                             Width="460"
@@ -931,7 +933,9 @@
                     </Border>
                 </Grid>
 
-                <Border Visibility="{Binding HasToast, Converter={StaticResource BoolVisibilityConverter}}"
+                <Border Grid.RowSpan="2"
+                        Panel.ZIndex="150"
+                        Visibility="{Binding HasToast, Converter={StaticResource BoolVisibilityConverter}}"
                         Background="{StaticResource PanelBrush}"
                         BorderBrush="{StaticResource LineBrush}"
                         BorderThickness="1"
@@ -939,7 +943,7 @@
                         Padding="16,10"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
-                        Margin="0,54,18,0">
+                        Margin="0,88,22,0">
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.12" Color="#64748B" />
                     </Border.Effect>

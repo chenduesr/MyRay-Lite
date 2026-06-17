@@ -1,5 +1,13 @@
 # Changelog
 
+## v1.6.1
+
+### UI Fixes
+
+- Fixed update-check dialogs being squeezed into the top title area.
+- Fixed top-right toast notifications overlapping the window control buttons.
+- Dialog and toast overlays now span the full content area with explicit z-order.
+
 ## v1.6.0
 
 ### Update Experience
