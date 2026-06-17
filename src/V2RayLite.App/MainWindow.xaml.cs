@@ -31,6 +31,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly SystemProxyService _systemProxyService = new();
     private readonly DelayTestService _delayTestService;
     private readonly DiagnosticsService _diagnosticsService;
+    private readonly DiagnosticPackageService _diagnosticPackageService;
     private readonly XrayDownloadService _downloadService;
     private readonly UpdateCheckService _updateCheckService;
     private readonly ObservableCollection<ProxyNode> _nodes = [];
@@ -45,6 +46,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _nodeSortKey = "Status";
     private bool _nodeSortAscending;
     private bool _isApplyingSettings;
+    private bool _isTestingNodes;
+    private double _testProgress;
+    private ProxyNode? _selectedNodeDetail;
+    private string _dialogTitle = string.Empty;
+    private string _dialogMessage = string.Empty;
+    private string _dialogPrimaryText = "确定";
+    private string _dialogSecondaryText = "取消";
+    private bool _isDialogOpen;
+    private string? _pendingInstallerPath;
+    private ReleaseAsset? _pendingInstallerAsset;
     private WinForms.ToolStripMenuItem? _trayStatusItem;
     private WinForms.ToolStripMenuItem? _trayNodeItem;
     private WinForms.ToolStripMenuItem? _trayToggleItem;
@@ -64,6 +75,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _xrayService = new XrayProcessService(_paths, configBuilder, _log);
         _delayTestService = new DelayTestService(_paths, configBuilder, _log);
         _diagnosticsService = new DiagnosticsService(_paths, configBuilder);
+        _diagnosticPackageService = new DiagnosticPackageService(_paths);
         _downloadService = new XrayDownloadService(httpClient, _paths);
         _updateCheckService = new UpdateCheckService(httpClient, _log);
         _notifyIcon = CreateNotifyIcon();
@@ -158,6 +170,96 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public bool HasToast => !string.IsNullOrWhiteSpace(_toastMessage);
+    public bool IsTestingNodes
+    {
+        get => _isTestingNodes;
+        set
+        {
+            _isTestingNodes = value;
+            Notify();
+            Notify(nameof(HasTestProgress));
+        }
+    }
+
+    public bool HasTestProgress => IsTestingNodes || TestProgress > 0;
+
+    public double TestProgress
+    {
+        get => _testProgress;
+        set
+        {
+            _testProgress = value;
+            Notify();
+            Notify(nameof(TestProgressText));
+            Notify(nameof(HasTestProgress));
+        }
+    }
+
+    public string TestProgressText => TestProgress <= 0 ? "准备测速" : $"测速进度 {TestProgress:P0}";
+    public ProxyNode? SelectedNodeDetail
+    {
+        get => _selectedNodeDetail;
+        set
+        {
+            _selectedNodeDetail = value;
+            Notify();
+            Notify(nameof(IsNodeDetailOpen));
+        }
+    }
+
+    public bool IsNodeDetailOpen => SelectedNodeDetail is not null;
+    public bool IsDialogOpen
+    {
+        get => _isDialogOpen;
+        set
+        {
+            _isDialogOpen = value;
+            Notify();
+        }
+    }
+
+    public string DialogTitle
+    {
+        get => _dialogTitle;
+        set
+        {
+            _dialogTitle = value;
+            Notify();
+        }
+    }
+
+    public string DialogMessage
+    {
+        get => _dialogMessage;
+        set
+        {
+            _dialogMessage = value;
+            Notify();
+        }
+    }
+
+    public string DialogPrimaryText
+    {
+        get => _dialogPrimaryText;
+        set
+        {
+            _dialogPrimaryText = value;
+            Notify();
+        }
+    }
+
+    public string DialogSecondaryText
+    {
+        get => _dialogSecondaryText;
+        set
+        {
+            _dialogSecondaryText = value;
+            Notify();
+            Notify(nameof(HasDialogSecondary));
+        }
+    }
+
+    public bool HasDialogSecondary => !string.IsNullOrWhiteSpace(DialogSecondaryText);
 
     public MediaBrush HomeNavBackground => NavBackground("Home");
     public MediaBrush NodesNavBackground => NavBackground("Nodes");
@@ -199,6 +301,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             await ConnectActiveNodeAsync(enableSystemProxy: true);
         }
+
+        if (_settings.AutoCheckUpdates)
+        {
+            _ = CheckForUpdatesOnLaunchAsync();
+        }
     }
 
     private void ApplySettingsToControls()
@@ -211,6 +318,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         StartOnBootCheckBox.IsChecked = _settings.StartOnBoot;
         SidebarStartupCheckBox.IsChecked = _settings.StartOnBoot;
         AutoConnectCheckBox.IsChecked = _settings.AutoConnectOnLaunch;
+        AutoCheckUpdatesCheckBox.IsChecked = _settings.AutoCheckUpdates;
         MinimizeToTrayCheckBox.IsChecked = _settings.MinimizeToTray;
         DarkModeCheckBox.IsChecked = _settings.DarkMode;
         RuleModeRadio.IsChecked = _settings.ProxyMode == ProxyMode.Rule;
@@ -465,22 +573,42 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void TestAllNodes_Click(object sender, RoutedEventArgs e)
     {
         ToastMessage = "正在测速...";
-        await _delayTestService.TestManyAsync(_nodes, _settings, _ =>
+        IsTestingNodes = true;
+        TestProgress = 0;
+        var tested = 0;
+        var total = Math.Max(1, _nodes.Count);
+        try
         {
-            Dispatcher.Invoke(() =>
+            await _delayTestService.TestManyAsync(_nodes, _settings, _ =>
             {
-                RefreshFilteredNodes();
-                RefreshStatusProperties();
+                Dispatcher.Invoke(() =>
+                {
+                    tested++;
+                    TestProgress = Math.Clamp(tested / (double)total, 0, 1);
+                    RefreshFilteredNodes();
+                    RefreshStatusProperties();
+                });
             });
-        });
-        await _store.SaveNodesAsync(_nodes);
-        var available = _nodes.Count(node => node.Status == NodeStatus.Available);
-        var unavailable = _nodes.Count(node => node.Status == NodeStatus.Unavailable);
-        var unsupported = _nodes.Count(node => !node.IsSupportedByXray);
-        ToastMessage = unsupported > 0
-            ? $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
-            : $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}。";
-        RefreshLogLines();
+            await _store.SaveNodesAsync(_nodes);
+            var available = _nodes.Count(node => node.Status == NodeStatus.Available);
+            var unavailable = _nodes.Count(node => node.Status == NodeStatus.Unavailable);
+            var unsupported = _nodes.Count(node => !node.IsSupportedByXray);
+            ToastMessage = unsupported > 0
+                ? $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
+                : $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}。";
+            TestProgress = 1;
+            RefreshLogLines();
+        }
+        catch (Exception ex)
+        {
+            ToastMessage = $"测速失败：{ex.Message}";
+            _log.Error(ToastMessage);
+            ShowDialog("测速失败", ex.Message, "知道了", string.Empty);
+        }
+        finally
+        {
+            IsTestingNodes = false;
+        }
     }
 
     private async Task TestNodeAsync(ProxyNode node)
@@ -556,6 +684,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void SettingsCheckBox_Click(object sender, RoutedEventArgs e)
     {
         _settings.AutoConnectOnLaunch = AutoConnectCheckBox.IsChecked == true;
+        _settings.AutoCheckUpdates = AutoCheckUpdatesCheckBox.IsChecked == true;
         _settings.MinimizeToTray = MinimizeToTrayCheckBox.IsChecked == true;
         _settings.DarkMode = DarkModeCheckBox.IsChecked == true;
         await _store.SaveSettingsAsync(_settings);
@@ -730,26 +859,94 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            if (!string.IsNullOrWhiteSpace(_latestReleaseUrl))
-            {
-                Process.Start(new ProcessStartInfo { FileName = _latestReleaseUrl, UseShellExecute = true });
-                return;
-            }
-
             ToastMessage = "正在检查更新...";
             var result = await _updateCheckService.CheckLatestAsync(GetCurrentVersion());
-            _latestReleaseUrl = result.HasUpdate ? result.ReleaseUrl : null;
-            ToastMessage = result.Message;
-
-            if (result.HasUpdate && !string.IsNullOrWhiteSpace(result.ReleaseUrl))
-            {
-                Process.Start(new ProcessStartInfo { FileName = result.ReleaseUrl, UseShellExecute = true });
-            }
+            HandleUpdateResult(result, showLatestDialog: true);
         }
         catch (Exception ex)
         {
             ToastMessage = $"检查更新失败：{ex.Message}";
             _log.Error(ToastMessage);
+            ShowDialog("检查更新失败", ex.Message, "知道了", string.Empty);
+            RefreshLogLines();
+        }
+    }
+
+    private async Task CheckForUpdatesOnLaunchAsync()
+    {
+        try
+        {
+            await Task.Delay(1800);
+            var result = await _updateCheckService.CheckLatestAsync(GetCurrentVersion());
+            HandleUpdateResult(result, showLatestDialog: false);
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"启动时检查更新失败：{ex.Message}");
+        }
+    }
+
+    private void HandleUpdateResult(UpdateCheckResult result, bool showLatestDialog)
+    {
+        _latestReleaseUrl = result.HasUpdate ? result.ReleaseUrl : null;
+
+        if (!result.HasUpdate)
+        {
+            if (showLatestDialog)
+            {
+                ToastMessage = result.Message;
+                ShowDialog("已经是最新版本", result.Message, "知道了", string.Empty);
+            }
+            else
+            {
+                _log.Info(result.Message);
+            }
+
+            return;
+        }
+
+        ToastMessage = result.Message;
+        _pendingInstallerAsset = result.InstallerAsset;
+        _pendingInstallerPath = null;
+
+        if (result.InstallerAsset is null)
+        {
+            ShowDialog("发现新版本", $"{result.Message}\n\n没有找到安装包资产，可以打开 Release 页面手动下载。", "打开页面", "稍后");
+            return;
+        }
+
+        ShowDialog(
+            "发现新版本",
+            $"{result.Message}\n\n可下载：{result.InstallerAsset.Name}\n大小：{FormatBytes(result.InstallerAsset.Size)}\n\n点击“下载更新”会下载新版安装包，下载完成后可立即安装。",
+            "下载更新",
+            "稍后");
+    }
+
+    private async Task DownloadPendingUpdateAsync()
+    {
+        if (_pendingInstallerAsset is null)
+        {
+            return;
+        }
+
+        try
+        {
+            IsDialogOpen = false;
+            ToastMessage = $"正在下载 {_pendingInstallerAsset.Name}...";
+            var progress = new Progress<double>(value => ToastMessage = $"正在下载更新 {value:P0}");
+            _pendingInstallerPath = await _updateCheckService.DownloadInstallerAsync(_pendingInstallerAsset, _paths, progress);
+            _pendingInstallerAsset = null;
+            ShowDialog(
+                "更新已下载",
+                $"安装包已下载到：\n{_pendingInstallerPath}\n\n点击“立即安装”后会静默运行安装程序，应用可能会自动关闭。",
+                "立即安装",
+                "稍后");
+        }
+        catch (Exception ex)
+        {
+            ToastMessage = $"下载更新失败：{ex.Message}";
+            _log.Error(ToastMessage);
+            ShowDialog("下载更新失败", ex.Message, "知道了", string.Empty);
             RefreshLogLines();
         }
     }
@@ -775,6 +972,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             FileName = _paths.LogDirectory,
             UseShellExecute = true
         });
+    }
+
+    private void CreateDiagnosticPackage_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            var file = _diagnosticPackageService.CreatePackage(_settings, _nodes, AppVersionText);
+            WpfClipboard.SetText(file);
+            ToastMessage = "诊断包已生成，路径已复制。";
+            _log.Info($"诊断包已生成：{file}");
+            RefreshLogLines();
+            ShowDialog("诊断包已生成", $"已生成脱敏诊断包，并复制路径：\n{file}", "打开目录", "关闭");
+            _pendingInstallerPath = null;
+        }
+        catch (Exception ex)
+        {
+            ToastMessage = $"诊断包生成失败：{ex.Message}";
+            _log.Error(ToastMessage);
+            ShowDialog("诊断包生成失败", ex.Message, "知道了", string.Empty);
+        }
     }
 
     private void RunDiagnostics_Click(object sender, RoutedEventArgs e)
@@ -827,6 +1044,76 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             DragMove();
         }
+    }
+
+    private void ViewNodeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: string nodeId })
+        {
+            SelectedNodeDetail = _nodes.FirstOrDefault(node => node.Id == nodeId);
+        }
+    }
+
+    private void CloseNodeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        SelectedNodeDetail = null;
+    }
+
+    private async void DialogPrimary_Click(object sender, RoutedEventArgs e)
+    {
+        if (_pendingInstallerAsset is not null)
+        {
+            await DownloadPendingUpdateAsync();
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_pendingInstallerPath) && File.Exists(_pendingInstallerPath))
+        {
+            Process.Start(new ProcessStartInfo
+            {
+                FileName = _pendingInstallerPath,
+                Arguments = "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS",
+                UseShellExecute = true
+            });
+            Close();
+            return;
+        }
+
+        if (!string.IsNullOrWhiteSpace(_latestReleaseUrl) && DialogPrimaryText.Contains("页面", StringComparison.Ordinal))
+        {
+            Process.Start(new ProcessStartInfo { FileName = _latestReleaseUrl, UseShellExecute = true });
+        }
+        else if (DialogPrimaryText.Contains("打开", StringComparison.Ordinal) && Directory.Exists(_paths.DiagnosticDirectory))
+        {
+            Process.Start(new ProcessStartInfo { FileName = _paths.DiagnosticDirectory, UseShellExecute = true });
+        }
+
+        IsDialogOpen = false;
+    }
+
+    private void DialogSecondary_Click(object sender, RoutedEventArgs e)
+    {
+        IsDialogOpen = false;
+    }
+
+    private void ShowDialog(string title, string message, string primaryText, string secondaryText)
+    {
+        DialogTitle = title;
+        DialogMessage = message;
+        DialogPrimaryText = string.IsNullOrWhiteSpace(primaryText) ? "确定" : primaryText;
+        DialogSecondaryText = secondaryText;
+        IsDialogOpen = true;
+    }
+
+    private static string FormatBytes(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "未知";
+        }
+
+        var mb = bytes / 1024d / 1024d;
+        return $"{mb:0.0} MB";
     }
 
     private void ShowFromTray()
@@ -948,6 +1235,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SetBrush("SubtleTextBrush", dark ? "#9FB0C6" : "#64748B");
         SetBrush("SidebarTextBrush", dark ? "#D8E2F0" : "#334155");
         SetBrush("LineBrush", dark ? "#27364D" : "#E1E8F2");
+        SetBrush("LogTextBrush", dark ? "#DCE7F5" : "#263445");
     }
 
     private void SetBrush(string key, string color)

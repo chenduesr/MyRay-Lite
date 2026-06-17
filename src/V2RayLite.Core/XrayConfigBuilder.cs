@@ -467,39 +467,37 @@ public sealed class XrayConfigBuilder
         if (mode == ProxyMode.Rule)
         {
             AddCustomRoutingRule(rules, "block", ParseList(settings.BlockDomains), ParseList(settings.BlockIps));
-            AddCustomRoutingRule(rules, "proxy", ParseList(settings.ProxyDomains), ParseList(settings.ProxyIps));
-            AddCustomRoutingRule(rules, "direct", ParseList(settings.DirectDomains), ParseList(settings.DirectIps));
 
             if (settings.BypassMainland)
             {
-                rules.Add(new JsonObject
-                {
-                    ["type"] = "field",
-                    ["ip"] = new JsonArray("geoip:private", "geoip:cn"),
-                    ["outboundTag"] = "direct"
-                });
-                rules.Add(new JsonObject
-                {
-                    ["type"] = "field",
-                    ["domain"] = new JsonArray("geosite:cn"),
-                    ["outboundTag"] = "direct"
-                });
+                AddRoutingRule(
+                    rules,
+                    "direct",
+                    domains: ["geosite:private", "geosite:cn"],
+                    ips: ["geoip:private", "geoip:cn"]);
+
+                AddRoutingRule(
+                    rules,
+                    "proxy",
+                    domains: ["geosite:geolocation-!cn"],
+                    ips: []);
             }
 
-            if (settings.RoutingRuleMode == RoutingRuleMode.Whitelist)
+            AddCustomRoutingRule(rules, "direct", ParseList(settings.DirectDomains), ParseList(settings.DirectIps));
+            AddCustomRoutingRule(rules, "proxy", ParseList(settings.ProxyDomains), ParseList(settings.ProxyIps));
+
+            var finalOutbound = settings.RoutingRuleMode == RoutingRuleMode.Whitelist ? "direct" : "proxy";
+            rules.Add(new JsonObject
             {
-                rules.Add(new JsonObject
-                {
-                    ["type"] = "field",
-                    ["network"] = "tcp,udp",
-                    ["outboundTag"] = "direct"
-                });
-            }
+                ["type"] = "field",
+                ["network"] = "tcp,udp",
+                ["outboundTag"] = finalOutbound
+            });
         }
 
         return new JsonObject
         {
-            ["domainStrategy"] = "AsIs",
+            ["domainStrategy"] = mode == ProxyMode.Rule ? "IPIfNonMatch" : "AsIs",
             ["rules"] = rules
         };
     }
@@ -564,6 +562,32 @@ public sealed class XrayConfigBuilder
     }
 
     private static void AddCustomRoutingRule(JsonArray rules, string outboundTag, IReadOnlyList<string> domains, IReadOnlyList<string> ips)
+    {
+        if (domains.Count == 0 && ips.Count == 0)
+        {
+            return;
+        }
+
+        var rule = new JsonObject
+        {
+            ["type"] = "field",
+            ["outboundTag"] = outboundTag
+        };
+
+        if (domains.Count > 0)
+        {
+            rule["domain"] = new JsonArray(domains.Select(item => JsonValue.Create(item)).ToArray());
+        }
+
+        if (ips.Count > 0)
+        {
+            rule["ip"] = new JsonArray(ips.Select(item => JsonValue.Create(item)).ToArray());
+        }
+
+        rules.Add(rule);
+    }
+
+    private static void AddRoutingRule(JsonArray rules, string outboundTag, IReadOnlyList<string> domains, IReadOnlyList<string> ips)
     {
         if (domains.Count == 0 && ips.Count == 0)
         {

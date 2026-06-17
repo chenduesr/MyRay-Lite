@@ -27,14 +27,87 @@ public sealed class SettingsStore
 
         try
         {
-            await using var stream = File.OpenRead(_paths.SettingsFile);
-            return await JsonSerializer.DeserializeAsync<AppSettings>(stream, JsonOptions, cancellationToken)
+            var json = await File.ReadAllTextAsync(_paths.SettingsFile, cancellationToken);
+            var fileVersion = ReadSettingsVersion(json);
+            var settings = JsonSerializer.Deserialize<AppSettings>(json, JsonOptions)
                 ?? new AppSettings();
+            if (fileVersion is null)
+            {
+                settings.SettingsVersion = 0;
+            }
+
+            return await MigrateSettingsAsync(settings, cancellationToken);
         }
         catch
         {
             return new AppSettings();
         }
+    }
+
+    private static int? ReadSettingsVersion(string json)
+    {
+        try
+        {
+            using var document = JsonDocument.Parse(json);
+            if (document.RootElement.TryGetProperty(nameof(AppSettings.SettingsVersion), out var version) &&
+                version.TryGetInt32(out var value))
+            {
+                return value;
+            }
+        }
+        catch
+        {
+            // Invalid settings will be handled by normal fallback.
+        }
+
+        return null;
+    }
+
+    private async Task<AppSettings> MigrateSettingsAsync(AppSettings settings, CancellationToken cancellationToken)
+    {
+        if (settings.SettingsVersion >= AppSettings.CurrentSettingsVersion)
+        {
+            return settings;
+        }
+
+        _paths.Ensure();
+        var backupFile = Path.Combine(_paths.BackupDirectory, $"settings-v{settings.SettingsVersion}-{DateTime.Now:yyyyMMdd-HHmmss}.json");
+        try
+        {
+            if (File.Exists(_paths.SettingsFile))
+            {
+                File.Copy(_paths.SettingsFile, backupFile, overwrite: false);
+            }
+        }
+        catch
+        {
+            // Migration backup is best effort.
+        }
+
+        settings.SettingsVersion = AppSettings.CurrentSettingsVersion;
+
+        if (settings.DelayTestBatchSize <= 0)
+        {
+            settings.DelayTestBatchSize = 40;
+        }
+
+        if (settings.DelayTestRetryBatchSize <= 0)
+        {
+            settings.DelayTestRetryBatchSize = 8;
+        }
+
+        if (settings.DelayTestTimeoutSeconds <= 0)
+        {
+            settings.DelayTestTimeoutSeconds = 10;
+        }
+
+        if (settings.DelayDownloadBytes <= 0)
+        {
+            settings.DelayDownloadBytes = 1048576;
+        }
+
+        await SaveSettingsAsync(settings, cancellationToken);
+        return settings;
     }
 
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)

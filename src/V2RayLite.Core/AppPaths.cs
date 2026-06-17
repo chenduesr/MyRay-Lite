@@ -11,6 +11,10 @@ public sealed class AppPaths
         GeneratedConfigFile = Path.Combine(AppDataRoot, "xray.generated.json");
         LogDirectory = Path.Combine(AppDataRoot, "logs");
         AppLogFile = Path.Combine(LogDirectory, "myray-lite.log");
+        UpdateDirectory = Path.Combine(AppDataRoot, "updates");
+        CrashDirectory = Path.Combine(AppDataRoot, "crashes");
+        DiagnosticDirectory = Path.Combine(AppDataRoot, "diagnostics");
+        BackupDirectory = Path.Combine(AppDataRoot, "backups");
     }
 
     public string AppDataRoot { get; }
@@ -19,11 +23,19 @@ public sealed class AppPaths
     public string GeneratedConfigFile { get; }
     public string LogDirectory { get; }
     public string AppLogFile { get; }
+    public string UpdateDirectory { get; }
+    public string CrashDirectory { get; }
+    public string DiagnosticDirectory { get; }
+    public string BackupDirectory { get; }
 
     public void Ensure()
     {
         Directory.CreateDirectory(AppDataRoot);
         Directory.CreateDirectory(LogDirectory);
+        Directory.CreateDirectory(UpdateDirectory);
+        Directory.CreateDirectory(CrashDirectory);
+        Directory.CreateDirectory(DiagnosticDirectory);
+        Directory.CreateDirectory(BackupDirectory);
     }
 
     public string FindXrayDirectory()

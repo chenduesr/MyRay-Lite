@@ -1,5 +1,47 @@
 # Changelog
 
+## v1.6.0
+
+### Update Experience
+
+- In-app update checks now detect the Setup installer asset from GitHub Releases.
+- Startup update checks can remind users when a newer Release is available without downloading silently.
+- The Settings page includes a startup update check toggle.
+- The app downloads the newer installer into the local updates directory only after user confirmation.
+- After download, the app offers an immediate silent installer launch.
+- Release workflow now supports optional installer code signing when certificate secrets are configured.
+
+### Routing
+
+- Rule mode now explicitly routes mainland China and private traffic directly.
+- `geosite:geolocation-!cn` traffic now explicitly uses the proxy outbound, improving YouTube/Google style routing.
+- Rule mode now uses `IPIfNonMatch` so unmatched domains can still fall back to IP geo rules.
+- Smart and blacklist templates now default unmatched traffic to proxy; whitelist defaults unmatched traffic to direct.
+
+### App Lifecycle
+
+- Added a single-instance guard so MyRay Lite cannot be opened twice at the same time.
+- When a second launch is attempted, the app shows a clear prompt and exits the duplicate instance.
+
+### Crash And Diagnostics
+
+- Added local crash log collection for UI, domain, and unobserved task exceptions.
+- Added a redacted diagnostic package generator.
+- The Logs page now includes a diagnostics package button and copies the generated package path.
+- Diagnostic packages include system info, redacted settings, redacted node summaries, recent logs, crash logs, and a redacted generated Xray config.
+
+### UI Polish
+
+- Added a speed test progress bar to the Nodes page.
+- Added a node details drawer for protocol, address, port, security, test type, delay, and status.
+- Added a unified modal dialog for update, error, and diagnostics actions.
+- Improved dark mode coverage for logs and progress indicators.
+
+### Configuration Migration
+
+- Added settings schema versioning.
+- Older settings are backed up and migrated automatically when loaded.
+
 ## v1.5.0
 
 ### Speed Test

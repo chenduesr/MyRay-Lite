@@ -68,11 +68,15 @@ public enum DiagnosticSeverity
 
 public sealed class AppSettings
 {
+    public const int CurrentSettingsVersion = 2;
+
+    public int SettingsVersion { get; set; } = CurrentSettingsVersion;
     public string SubscriptionUrl { get; set; } = string.Empty;
     public ProxyMode ProxyMode { get; set; } = ProxyMode.Rule;
     public RoutingRuleMode RoutingRuleMode { get; set; } = RoutingRuleMode.Smart;
     public bool StartOnBoot { get; set; } = true;
     public bool AutoConnectOnLaunch { get; set; } = true;
+    public bool AutoCheckUpdates { get; set; } = true;
     public bool MinimizeToTray { get; set; } = true;
     public bool DarkMode { get; set; }
     public int HttpPort { get; set; } = 7890;
@@ -99,6 +103,13 @@ public sealed class AppSettings
     public string DotDns { get; set; } = "tls://1.1.1.1";
     public string? ActiveNodeId { get; set; }
     public DateTimeOffset? LastSubscriptionUpdate { get; set; }
+}
+
+public sealed class ReleaseAsset
+{
+    public string Name { get; set; } = string.Empty;
+    public string DownloadUrl { get; set; } = string.Empty;
+    public long Size { get; set; }
 }
 
 public sealed class ProxyNode
