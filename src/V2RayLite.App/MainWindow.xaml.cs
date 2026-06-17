@@ -4,9 +4,11 @@ using System.Diagnostics;
 using System.IO;
 using System.Net.Http;
 using System.Reflection;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using System.Windows.Media;
 using System.Windows.Media.Animation;
 using V2RayLite.Core;
 using MediaBrush = System.Windows.Media.Brush;
@@ -48,6 +50,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isApplyingSettings;
     private bool _isTestingNodes;
     private double _testProgress;
+    private string _testProgressDetail = "等待开始测速";
     private ProxyNode? _selectedNodeDetail;
     private string _dialogTitle = string.Empty;
     private string _dialogMessage = string.Empty;
@@ -60,6 +63,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private WinForms.ToolStripMenuItem? _trayNodeItem;
     private WinForms.ToolStripMenuItem? _trayToggleItem;
     private WinForms.ToolStripMenuItem? _traySwitchNodeItem;
+    private WinForms.ContextMenuStrip? _trayMenu;
     private string? _latestReleaseUrl;
 
     public MainWindow()
@@ -196,6 +200,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public string TestProgressText => TestProgress <= 0 ? "准备测速" : $"测速进度 {TestProgress:P0}";
+    public string TestProgressDetail
+    {
+        get => _testProgressDetail;
+        set
+        {
+            _testProgressDetail = value;
+            Notify();
+        }
+    }
+
     public ProxyNode? SelectedNodeDetail
     {
         get => _selectedNodeDetail;
@@ -296,6 +310,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
         RefreshLogLines();
         RefreshStatusProperties();
+        CheckPendingUpdateMarker();
 
         if (_settings.AutoConnectOnLaunch && ActiveNode is not null && File.Exists(_xrayService.XrayExePath))
         {
@@ -351,6 +366,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private WinForms.NotifyIcon CreateNotifyIcon()
     {
         var menu = new WinForms.ContextMenuStrip();
+        _trayMenu = menu;
         _trayStatusItem = new WinForms.ToolStripMenuItem("当前状态：未连接") { Enabled = false };
         _trayNodeItem = new WinForms.ToolStripMenuItem("当前节点：未选择") { Enabled = false };
         _trayToggleItem = new WinForms.ToolStripMenuItem("开启代理");
@@ -382,6 +398,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         menu.Items.Add(new WinForms.ToolStripSeparator());
         menu.Items.Add("退出", null, (_, _) => Dispatcher.BeginInvoke(new Action(Close)));
         menu.Opening += (_, _) => UpdateTrayMenu();
+        ApplyTrayTheme(menu);
 
         var notifyIcon = new WinForms.NotifyIcon
         {
@@ -575,16 +592,19 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         ToastMessage = "正在测速...";
         IsTestingNodes = true;
         TestProgress = 0;
+        TestProgressDetail = "正在准备批量测速...";
         var tested = 0;
         var total = Math.Max(1, _nodes.Count);
         try
         {
-            await _delayTestService.TestManyAsync(_nodes, _settings, _ =>
+            await _delayTestService.TestManyAsync(_nodes, _settings, node =>
             {
                 Dispatcher.Invoke(() =>
                 {
                     tested++;
                     TestProgress = Math.Clamp(tested / (double)total, 0, 1);
+                    var state = node.Status == NodeStatus.Available ? node.DisplayDelay : node.DisplayFailureReason;
+                    TestProgressDetail = $"{tested}/{total}  {node.Name}  {state}";
                     RefreshFilteredNodes();
                     RefreshStatusProperties();
                 });
@@ -597,11 +617,13 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 ? $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
                 : $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}。";
             TestProgress = 1;
+            TestProgressDetail = $"完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。";
             RefreshLogLines();
         }
         catch (Exception ex)
         {
             ToastMessage = $"测速失败：{ex.Message}";
+            TestProgressDetail = $"测速失败：{ex.Message}";
             _log.Error(ToastMessage);
             ShowDialog("测速失败", ex.Message, "知道了", string.Empty);
         }
@@ -946,7 +968,11 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             ToastMessage = $"下载更新失败：{ex.Message}";
             _log.Error(ToastMessage);
-            ShowDialog("下载更新失败", ex.Message, "知道了", string.Empty);
+            ShowDialog(
+                "下载更新失败",
+                $"新版安装包下载失败，当前版本未受影响。\n\n你可以稍后重试，或到 Release 页面手动下载。\n\n错误：{ex.Message}",
+                "知道了",
+                string.Empty);
             RefreshLogLines();
         }
     }
@@ -1054,6 +1080,38 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private async void SaveNodeDetails_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedNodeDetail is null)
+        {
+            return;
+        }
+
+        if (string.IsNullOrWhiteSpace(SelectedNodeDetail.Name) ||
+            string.IsNullOrWhiteSpace(SelectedNodeDetail.Address) ||
+            SelectedNodeDetail.Port is < 1 or > 65535)
+        {
+            ShowDialog("节点信息不完整", "请确认节点名称、地址和端口正确。端口范围为 1-65535。", "知道了", string.Empty);
+            return;
+        }
+
+        await _store.SaveNodesAsync(_nodes);
+        RefreshFilteredNodes();
+        RefreshStatusProperties();
+        UpdateTrayMenu();
+
+        if (_isProxyEnabled && SelectedNodeDetail.IsActive)
+        {
+            DisableProxy();
+            await ConnectActiveNodeAsync(enableSystemProxy: true);
+            ToastMessage = "节点已保存，并重新连接当前节点。";
+        }
+        else
+        {
+            ToastMessage = "节点已保存。";
+        }
+    }
+
     private void CloseNodeDetails_Click(object sender, RoutedEventArgs e)
     {
         SelectedNodeDetail = null;
@@ -1069,13 +1127,26 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         if (!string.IsNullOrWhiteSpace(_pendingInstallerPath) && File.Exists(_pendingInstallerPath))
         {
-            Process.Start(new ProcessStartInfo
+            try
             {
-                FileName = _pendingInstallerPath,
-                Arguments = "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS",
-                UseShellExecute = true
-            });
-            Close();
+                WritePendingUpdateMarker(_pendingInstallerPath);
+                Process.Start(new ProcessStartInfo
+                {
+                    FileName = _pendingInstallerPath,
+                    Arguments = "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
+                    UseShellExecute = true
+                });
+                Close();
+            }
+            catch (Exception ex)
+            {
+                _log.Error($"启动更新安装包失败：{ex.Message}");
+                ShowDialog(
+                    "无法启动安装包",
+                    $"安装包启动失败，当前版本未受影响。\n\n你可以手动运行：\n{_pendingInstallerPath}\n\n错误：{ex.Message}",
+                    "知道了",
+                    string.Empty);
+            }
             return;
         }
 
@@ -1103,6 +1174,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         DialogPrimaryText = string.IsNullOrWhiteSpace(primaryText) ? "确定" : primaryText;
         DialogSecondaryText = secondaryText;
         IsDialogOpen = true;
+        BeginDialogAnimation();
     }
 
     private static string FormatBytes(long bytes)
@@ -1115,6 +1187,55 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var mb = bytes / 1024d / 1024d;
         return $"{mb:0.0} MB";
     }
+
+    private void WritePendingUpdateMarker(string installerPath)
+    {
+        _paths.Ensure();
+        var marker = new PendingUpdateMarker(
+            GetCurrentVersion().ToString(),
+            installerPath,
+            DateTimeOffset.Now);
+        File.WriteAllText(_paths.PendingUpdateFile, JsonSerializer.Serialize(marker, new JsonSerializerOptions { WriteIndented = true }));
+    }
+
+    private void CheckPendingUpdateMarker()
+    {
+        try
+        {
+            if (!File.Exists(_paths.PendingUpdateFile))
+            {
+                return;
+            }
+
+            var marker = JsonSerializer.Deserialize<PendingUpdateMarker>(File.ReadAllText(_paths.PendingUpdateFile));
+            File.Delete(_paths.PendingUpdateFile);
+            if (marker is null || !Version.TryParse(marker.PreviousVersion, out var previousVersion))
+            {
+                return;
+            }
+
+            var currentVersion = GetCurrentVersion();
+            if (currentVersion <= previousVersion)
+            {
+                ShowDialog(
+                    "更新可能未完成",
+                    $"上次更新安装似乎没有完成，当前仍是 {currentVersion}。\n\n旧版本和配置已保留，可以继续使用。你也可以重新检查更新，或手动运行安装包：\n{marker.InstallerPath}",
+                    "知道了",
+                    string.Empty);
+                _log.Warn($"更新可能未完成，当前版本 {currentVersion}，上次安装包：{marker.InstallerPath}");
+            }
+            else
+            {
+                _log.Info($"更新完成：{previousVersion} -> {currentVersion}");
+            }
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"读取更新状态失败：{ex.Message}");
+        }
+    }
+
+    private sealed record PendingUpdateMarker(string PreviousVersion, string InstallerPath, DateTimeOffset StartedAt);
 
     private void ShowFromTray()
     {
@@ -1236,6 +1357,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SetBrush("SidebarTextBrush", dark ? "#D8E2F0" : "#334155");
         SetBrush("LineBrush", dark ? "#27364D" : "#E1E8F2");
         SetBrush("LogTextBrush", dark ? "#DCE7F5" : "#263445");
+        if (_trayMenu is not null)
+        {
+            ApplyTrayTheme(_trayMenu);
+        }
     }
 
     private void SetBrush(string key, string color)
@@ -1259,6 +1384,23 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
         });
+    }
+
+    private void BeginDialogAnimation()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            DialogCard.Opacity = 0;
+            DialogCardTransform.Y = 18;
+            DialogCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            });
+            DialogCardTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(18, 0, TimeSpan.FromMilliseconds(220))
+            {
+                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            });
+        }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
     private void UpdateTrayMenu()
@@ -1292,6 +1434,41 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                 await SetActiveNodeAsync(node, reconnect: _isProxyEnabled);
             }));
             _traySwitchNodeItem.DropDownItems.Add(item);
+        }
+
+        if (_trayMenu is not null)
+        {
+            ApplyTrayTheme(_trayMenu);
+        }
+    }
+
+    private void ApplyTrayTheme(WinForms.ContextMenuStrip menu)
+    {
+        var dark = _settings.DarkMode;
+        var back = dark ? System.Drawing.Color.FromArgb(23, 32, 51) : System.Drawing.Color.White;
+        var fore = dark ? System.Drawing.Color.FromArgb(238, 243, 250) : System.Drawing.Color.FromArgb(17, 24, 39);
+        var muted = dark ? System.Drawing.Color.FromArgb(159, 176, 198) : System.Drawing.Color.FromArgb(100, 116, 139);
+
+        menu.BackColor = back;
+        menu.ForeColor = fore;
+        foreach (WinForms.ToolStripItem item in menu.Items)
+        {
+            ApplyTrayItemTheme(item, back, fore, muted);
+        }
+    }
+
+    private void ApplyTrayItemTheme(WinForms.ToolStripItem item, System.Drawing.Color back, System.Drawing.Color fore, System.Drawing.Color muted)
+    {
+        item.BackColor = back;
+        item.ForeColor = item.Enabled ? fore : muted;
+        if (item is WinForms.ToolStripMenuItem menuItem)
+        {
+            menuItem.DropDown.BackColor = back;
+            menuItem.DropDown.ForeColor = fore;
+            foreach (WinForms.ToolStripItem child in menuItem.DropDownItems)
+            {
+                ApplyTrayItemTheme(child, back, fore, muted);
+            }
         }
     }
 

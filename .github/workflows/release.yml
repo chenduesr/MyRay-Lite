@@ -46,6 +46,27 @@ jobs:
           Get-ChildItem -Path $extract -Recurse -Include xray.exe,geoip.dat,geosite.dat |
             Copy-Item -Destination publish/MyRay-Lite-win-x64/bin/xray -Force
 
+      - name: Sign published app if certificate is configured
+        shell: pwsh
+        env:
+          SIGN_PFX_BASE64: ${{ secrets.WINDOWS_SIGNING_CERT_BASE64 }}
+          SIGN_PFX_PASSWORD: ${{ secrets.WINDOWS_SIGNING_CERT_PASSWORD }}
+        run: |
+          if ([string]::IsNullOrWhiteSpace($env:SIGN_PFX_BASE64) -or [string]::IsNullOrWhiteSpace($env:SIGN_PFX_PASSWORD)) {
+            Write-Host "Signing certificate secrets are not configured. Skipping app signing."
+            exit 0
+          }
+
+          $pfx = Join-Path $env:TEMP "myray-lite-signing.pfx"
+          [IO.File]::WriteAllBytes($pfx, [Convert]::FromBase64String($env:SIGN_PFX_BASE64))
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin" -Recurse -Filter signtool.exe |
+            Where-Object { $_.FullName -match "\\x64\\signtool\.exe$" } |
+            Sort-Object FullName -Descending |
+            Select-Object -First 1
+          if (-not $signtool) { throw "signtool.exe not found." }
+
+          & $signtool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:SIGN_PFX_PASSWORD publish/MyRay-Lite-win-x64/MyRayLite.exe
+
       - name: Create portable zip
         shell: pwsh
         run: |
@@ -106,9 +127,10 @@ jobs:
             - 应用内检查更新现在会直接下载新版 Setup 安装包。
             - 下载完成后可选择立即静默安装。
             - 新增崩溃日志收集和脱敏诊断包生成。
-            - 节点列表新增测速进度条和节点详情抽屉。
-            - 暗色模式、统一弹窗和错误提示继续精修。
-            - Release workflow 支持配置代码签名证书后自动签名安装包。
+            - 节点列表新增测速进度明细和可编辑节点详情抽屉。
+            - 暗色模式、托盘菜单、统一弹窗和错误提示继续精修。
+            - Release workflow 支持配置代码签名证书后自动签名主程序和安装包。
+            - 应用内安装更新会尝试关闭并重启应用，失败时保留旧版本并提示回滚状态。
 
             完整变更记录见 `CHANGELOG.md`。
           files: |

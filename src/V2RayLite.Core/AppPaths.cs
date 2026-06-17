@@ -12,6 +12,7 @@ public sealed class AppPaths
         LogDirectory = Path.Combine(AppDataRoot, "logs");
         AppLogFile = Path.Combine(LogDirectory, "myray-lite.log");
         UpdateDirectory = Path.Combine(AppDataRoot, "updates");
+        PendingUpdateFile = Path.Combine(UpdateDirectory, "pending-update.json");
         CrashDirectory = Path.Combine(AppDataRoot, "crashes");
         DiagnosticDirectory = Path.Combine(AppDataRoot, "diagnostics");
         BackupDirectory = Path.Combine(AppDataRoot, "backups");
@@ -24,6 +25,7 @@ public sealed class AppPaths
     public string LogDirectory { get; }
     public string AppLogFile { get; }
     public string UpdateDirectory { get; }
+    public string PendingUpdateFile { get; }
     public string CrashDirectory { get; }
     public string DiagnosticDirectory { get; }
     public string BackupDirectory { get; }

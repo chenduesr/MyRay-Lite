@@ -32,10 +32,18 @@
 
 ### UI Polish
 
-- Added a speed test progress bar to the Nodes page.
-- Added a node details drawer for protocol, address, port, security, test type, delay, and status.
-- Added a unified modal dialog for update, error, and diagnostics actions.
-- Improved dark mode coverage for logs and progress indicators.
+- Added a detailed speed test progress panel with current node and result text.
+- Added an editable node details drawer for common node fields such as name, address, port, transport, security, SNI, host, and path.
+- Saving the active node now reconnects automatically when the proxy is running.
+- Added a unified modal dialog for update, error, and diagnostics actions with an entrance animation.
+- Improved dark mode coverage for logs, progress indicators, and tray menu items.
+
+### Release And Installer
+
+- Signed portable app binaries before zip packaging when signing certificate secrets are configured.
+- Installer signing remains automatic when signing certificate secrets are configured.
+- In-app installer launch now asks the installer to close and restart the app.
+- Added a pending-update marker so the next launch can warn if installation did not complete and the old version is still running.
 
 ### Configuration Migration
 

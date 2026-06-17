@@ -483,12 +483,17 @@
                                     Padding="14,10"
                                     Margin="0,0,0,14">
                                 <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="120" />
                                     </Grid.ColumnDefinitions>
                                     <ProgressBar Height="8" Minimum="0" Maximum="1" Value="{Binding TestProgress}" Foreground="{StaticResource BlueBrush}" Background="{StaticResource LineBrush}" VerticalAlignment="Center" />
                                     <TextBlock Grid.Column="1" Text="{Binding TestProgressText}" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" FontWeight="SemiBold" HorizontalAlignment="Right" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="1" Grid.ColumnSpan="2" Text="{Binding TestProgressDetail}" Foreground="{StaticResource SubtleTextBrush}" FontSize="13" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" />
                                 </Grid>
                             </Border>
 
@@ -848,37 +853,47 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
-                                        <RowDefinition Height="38" />
-                                        <RowDefinition Height="38" />
-                                        <RowDefinition Height="38" />
-                                        <RowDefinition Height="38" />
-                                        <RowDefinition Height="38" />
-                                        <RowDefinition Height="38" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
+                                        <RowDefinition Height="50" />
                                         <RowDefinition Height="38" />
                                         <RowDefinition Height="38" />
                                         <RowDefinition Height="38" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="协议" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Column="1" Text="{Binding SelectedNodeDetail.Protocol}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Text="名称" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Column="1" Text="{Binding SelectedNodeDetail.Name, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
                                     <TextBlock Grid.Row="1" Text="地址" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding SelectedNodeDetail.Address}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBox Grid.Row="1" Grid.Column="1" Text="{Binding SelectedNodeDetail.Address, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
                                     <TextBlock Grid.Row="2" Text="端口" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding SelectedNodeDetail.Port}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="2" Grid.Column="1" Text="{Binding SelectedNodeDetail.Port, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
                                     <TextBlock Grid.Row="3" Text="传输" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="3" Grid.Column="1" Text="{Binding SelectedNodeDetail.Network}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="3" Grid.Column="1" Text="{Binding SelectedNodeDetail.Network, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
                                     <TextBlock Grid.Row="4" Text="安全" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="4" Grid.Column="1" Text="{Binding SelectedNodeDetail.Security}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="4" Grid.Column="1" Text="{Binding SelectedNodeDetail.Security, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
                                     <TextBlock Grid.Row="5" Text="SNI" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="5" Grid.Column="1" Text="{Binding SelectedNodeDetail.Sni}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
-                                    <TextBlock Grid.Row="6" Text="延迟" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="6" Grid.Column="1" Text="{Binding SelectedNodeDetail.DisplayDelay}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="7" Text="测速" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="7" Grid.Column="1" Text="{Binding SelectedNodeDetail.DisplayTestType}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="8" Text="状态" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
-                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding SelectedNodeDetail.Status}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="5" Grid.Column="1" Text="{Binding SelectedNodeDetail.Sni, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
+                                    <TextBlock Grid.Row="6" Text="Host" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="6" Grid.Column="1" Text="{Binding SelectedNodeDetail.Host, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
+                                    <TextBlock Grid.Row="7" Text="Path" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBox Grid.Row="7" Grid.Column="1" Text="{Binding SelectedNodeDetail.Path, Mode=TwoWay, UpdateSourceTrigger=PropertyChanged}" Height="40" FontSize="15" />
+                                    <TextBlock Grid.Row="8" Text="协议" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="8" Grid.Column="1" Text="{Binding SelectedNodeDetail.Protocol}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Row="9" Text="延迟" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="9" Grid.Column="1" Text="{Binding SelectedNodeDetail.DisplayDelay}" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="10" Text="测速" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding SelectedNodeDetail.DisplayTestType}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="11" Text="状态" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="11" Grid.Column="1" Text="{Binding SelectedNodeDetail.Status}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 </Grid>
 
-                                <Button Content="复制节点信息" Style="{StaticResource OutlineButton}" Height="44" Margin="0,20,0,0" Click="CopyNode_Click" Tag="{Binding SelectedNodeDetail.Id}" />
+                                <Button Content="保存修改" Style="{StaticResource PrimaryButton}" Height="44" Margin="0,20,0,0" Click="SaveNodeDetails_Click" />
+                                <Button Content="复制节点信息" Style="{StaticResource OutlineButton}" Height="44" Margin="0,10,0,0" Click="CopyNode_Click" Tag="{Binding SelectedNodeDetail.Id}" />
                             </StackPanel>
                         </ScrollViewer>
                     </Grid>
@@ -886,7 +901,8 @@
 
                 <Grid Visibility="{Binding IsDialogOpen, Converter={StaticResource BoolVisibilityConverter}}"
                       Background="#660F172A">
-                    <Border Width="460"
+                    <Border x:Name="DialogCard"
+                            Width="460"
                             Background="{StaticResource PanelBrush}"
                             BorderBrush="{StaticResource LineBrush}"
                             BorderThickness="1"
@@ -894,6 +910,9 @@
                             Padding="26"
                             HorizontalAlignment="Center"
                             VerticalAlignment="Center">
+                        <Border.RenderTransform>
+                            <TranslateTransform x:Name="DialogCardTransform" />
+                        </Border.RenderTransform>
                         <Border.Effect>
                             <DropShadowEffect BlurRadius="28" ShadowDepth="10" Opacity="0.22" Color="#0F172A" />
                         </Border.Effect>
