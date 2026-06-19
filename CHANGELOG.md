@@ -1,5 +1,15 @@
 # Changelog
 
+## v1.6.4
+
+### UI and Window Fixes
+
+- Double-clicking MyRay Lite while it is hidden in the tray now restores the existing main window.
+- The sidebar version label now uses the live app version binding instead of a fixed placeholder.
+- The default window size is more conservative and starts centered to avoid clipping on smaller screens.
+- Navigation, cards, node rows, and progress panels received lighter hover states and softer shadows.
+- Node rows now have a clearer hover surface for better scanning.
+
 ## v1.6.3
 
 ### UI and Lifecycle Fixes
