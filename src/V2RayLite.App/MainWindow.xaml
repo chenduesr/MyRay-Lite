@@ -4,11 +4,10 @@
         xmlns:local="clr-namespace:V2RayLite.App"
         xmlns:core="clr-namespace:V2RayLite.Core;assembly=V2RayLite.Core"
         Title="MyRay Lite"
-        Width="1180"
-        Height="760"
-        MinWidth="1120"
-        MinHeight="690"
-        WindowStartupLocation="CenterScreen"
+        Width="1280"
+        Height="820"
+        MinWidth="1100"
+        MinHeight="720"
         WindowStyle="None"
         ResizeMode="CanResizeWithGrip"
         Background="Transparent"
@@ -41,11 +40,11 @@
         </Style>
 
         <Style x:Key="PageTitleText" TargetType="TextBlock">
-            <Setter Property="FontSize" Value="38" />
+            <Setter Property="FontSize" Value="40" />
             <Setter Property="FontWeight" Value="Bold" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
-            <Setter Property="LineHeight" Value="58" />
-            <Setter Property="Padding" Value="6,0,0,0" />
+            <Setter Property="LineHeight" Value="62" />
+            <Setter Property="Padding" Value="8,0,0,0" />
             <Setter Property="LineStackingStrategy" Value="BlockLineHeight" />
             <Setter Property="VerticalAlignment" Value="Center" />
             <Setter Property="TextOptions.TextFormattingMode" Value="Display" />
@@ -81,7 +80,7 @@
 
         <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Height" Value="58" />
-            <Setter Property="Margin" Value="18,5" />
+            <Setter Property="Margin" Value="18,4" />
             <Setter Property="Padding" Value="16,0" />
             <Setter Property="HorizontalContentAlignment" Value="Stretch" />
             <Setter Property="Background" Value="Transparent" />
@@ -91,13 +90,12 @@
             <Setter Property="Template">
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
-                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="8" BorderBrush="Transparent" BorderThickness="1">
+                        <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="8">
                             <ContentPresenter VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Root" Property="Background" Value="#EEF5FF" />
-                                <Setter TargetName="Root" Property="BorderBrush" Value="#D4E7FF" />
                             </Trigger>
                         </ControlTemplate.Triggers>
                     </ControlTemplate>
@@ -184,28 +182,9 @@
             <Setter Property="Padding" Value="28" />
             <Setter Property="Effect">
                 <Setter.Value>
-                    <DropShadowEffect BlurRadius="14" ShadowDepth="4" Opacity="0.055" Color="#64748B" />
+                    <DropShadowEffect BlurRadius="18" ShadowDepth="6" Opacity="0.06" Color="#64748B" />
                 </Setter.Value>
             </Setter>
-        </Style>
-
-        <Style x:Key="SoftPanel" TargetType="Border">
-            <Setter Property="Background" Value="#F8FBFF" />
-            <Setter Property="BorderBrush" Value="#E4ECF6" />
-            <Setter Property="BorderThickness" Value="1" />
-            <Setter Property="CornerRadius" Value="8" />
-        </Style>
-
-        <Style x:Key="NodeRow" TargetType="Border">
-            <Setter Property="CornerRadius" Value="8" />
-            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
-            <Setter Property="MinHeight" Value="68" />
-            <Setter Property="Margin" Value="0,0,0,2" />
-            <Style.Triggers>
-                <Trigger Property="IsMouseOver" Value="True">
-                    <Setter Property="Background" Value="#F7FBFF" />
-                </Trigger>
-            </Style.Triggers>
         </Style>
 
         <Style TargetType="TextBox">
@@ -379,7 +358,7 @@
                                 <Ellipse Fill="{Binding SidebarStatusBrush}" Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding SidebarStatus}" FontSize="15" Foreground="#526174" VerticalAlignment="Center" />
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="{Binding AppVersionText}" FontSize="15" Foreground="#526174" />
+                            <TextBlock Grid.Column="1" Text="v1.0.0" FontSize="15" Foreground="#526174" />
                         </Grid>
                         <Grid Height="34">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
@@ -497,7 +476,10 @@
 
                             <Border Grid.Row="2"
                                     Visibility="{Binding HasTestProgress, Converter={StaticResource BoolVisibilityConverter}}"
-                                    Style="{StaticResource SoftPanel}"
+                                    Background="{StaticResource PanelBrush}"
+                                    BorderBrush="{StaticResource LineBrush}"
+                                    BorderThickness="1"
+                                    CornerRadius="8"
                                     Padding="14,10"
                                     Margin="0,0,0,14">
                                 <Grid>
@@ -538,7 +520,7 @@
                                         <ItemsControl ItemsSource="{Binding FilteredNodes}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type core:ProxyNode}">
-                                                    <Border Style="{StaticResource NodeRow}">
+                                                    <Border CornerRadius="8" Background="{StaticResource PanelBrush}" MinHeight="68" Margin="0,0,0,2">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="30" />

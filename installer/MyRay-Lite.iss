@@ -1,5 +1,5 @@
 #define MyAppName "MyRay Lite"
-#define MyAppVersion "1.6.4"
+#define MyAppVersion "1.6.3"
 #define MyAppPublisher "MyRay Lite"
 #define MyAppExeName "MyRayLite.exe"
 

@@ -1273,7 +1273,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private sealed record PendingUpdateMarker(string PreviousVersion, string InstallerPath, DateTimeOffset StartedAt);
 
-    public void ShowFromTray()
+    private void ShowFromTray()
     {
         Show();
         WindowState = WindowState.Normal;

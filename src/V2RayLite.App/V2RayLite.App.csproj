@@ -10,10 +10,10 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AssemblyName>MyRayLite</AssemblyName>
     <Product>MyRay Lite</Product>
-    <Version>1.6.4</Version>
-    <AssemblyVersion>1.6.4.0</AssemblyVersion>
-    <FileVersion>1.6.4.0</FileVersion>
-    <InformationalVersion>1.6.4</InformationalVersion>
+    <Version>1.6.3</Version>
+    <AssemblyVersion>1.6.3.0</AssemblyVersion>
+    <FileVersion>1.6.3.0</FileVersion>
+    <InformationalVersion>1.6.3</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
