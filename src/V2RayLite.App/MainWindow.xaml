@@ -918,7 +918,7 @@
                             <TranslateTransform x:Name="DialogCardTransform" />
                         </Border.RenderTransform>
                         <Border.Effect>
-                            <DropShadowEffect BlurRadius="28" ShadowDepth="10" Opacity="0.22" Color="#0F172A" />
+                            <DropShadowEffect BlurRadius="20" ShadowDepth="6" Opacity="0.18" Color="#0F172A" />
                         </Border.Effect>
                         <StackPanel>
                             <TextBlock Text="{Binding DialogTitle}" FontSize="24" FontWeight="Bold" Foreground="{StaticResource TextBrush}" />
@@ -947,7 +947,7 @@
                         VerticalAlignment="Top"
                         Margin="0,88,22,0">
                     <Border.Effect>
-                        <DropShadowEffect BlurRadius="18" ShadowDepth="5" Opacity="0.12" Color="#64748B" />
+                        <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.10" Color="#64748B" />
                     </Border.Effect>
                     <TextBlock Text="{Binding ToastMessage}" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" TextWrapping="Wrap" MaxWidth="420" />
                 </Border>

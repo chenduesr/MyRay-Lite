@@ -43,12 +43,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private string _currentPage = "Home";
     private bool _isProxyEnabled;
     private string _toastMessage = string.Empty;
+    private CancellationTokenSource? _toastAutoCloseCts;
     private string _subscriptionStatus = "未更新";
     private string _searchText = string.Empty;
     private string _nodeSortKey = "Status";
     private bool _nodeSortAscending;
     private bool _isApplyingSettings;
     private bool _isTestingNodes;
+    private bool _isExplicitExit;
     private double _testProgress;
     private string _testProgressDetail = "等待开始测速";
     private ProxyNode? _selectedNodeDetail;
@@ -133,7 +135,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool HasNodes => FilteredNodes.Count > 0;
     public bool HasLogs => LogLines.Count > 0;
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
-    public string AppVersionText => $"v{GetCurrentVersion()}";
+    public string AppVersionText => $"v{GetCurrentVersionText()}";
     public string EmptyNodesTitle => _nodes.Count == 0 ? "暂无节点" : "没有匹配节点";
     public string EmptyNodesMessage => _nodes.Count == 0 ? "请在订阅页保存并更新订阅" : "换个关键词，或点击刷新重新加载列表";
     public string LastUpdateText => _settings.LastSubscriptionUpdate?.ToLocalTime().ToString("yyyy-MM-dd HH:mm") ?? "—";
@@ -170,6 +172,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _toastMessage = value;
             Notify();
             Notify(nameof(HasToast));
+            ScheduleToastAutoClose(value);
         }
     }
 
@@ -396,7 +399,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             CurrentPage = "Logs";
         })));
         menu.Items.Add(new WinForms.ToolStripSeparator());
-        menu.Items.Add("退出", null, (_, _) => Dispatcher.BeginInvoke(new Action(Close)));
+        menu.Items.Add("退出", null, (_, _) => Dispatcher.BeginInvoke(new Action(RequestExit)));
         menu.Opening += (_, _) => UpdateTrayMenu();
         ApplyTrayTheme(menu);
 
@@ -543,6 +546,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async void SaveSubscription_Click(object sender, RoutedEventArgs e)
     {
         _settings.SubscriptionUrl = SubscriptionUrlTextBox.Text.Trim();
+        if (string.IsNullOrWhiteSpace(_settings.SubscriptionUrl))
+        {
+            await ClearSubscriptionNodesAsync("订阅已清空，节点列表已清空。");
+            return;
+        }
+
         await _store.SaveSettingsAsync(_settings);
         ToastMessage = "订阅地址已保存。";
     }
@@ -551,6 +560,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         _settings.SubscriptionUrl = SubscriptionUrlTextBox.Text.Trim();
         await _store.SaveSettingsAsync(_settings);
+        if (string.IsNullOrWhiteSpace(_settings.SubscriptionUrl))
+        {
+            await ClearSubscriptionNodesAsync("订阅地址为空，节点列表已清空。");
+            return;
+        }
+
         ToastMessage = "正在更新订阅...";
         SubscriptionStatus = "更新中";
         _log.Info("开始更新订阅。");
@@ -571,6 +586,27 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SubscriptionStatus = snapshot.StatusText;
         ToastMessage = snapshot.StatusText;
         _log.Info($"订阅更新完成：{snapshot.StatusText}，节点 {snapshot.Nodes.Count} 个。");
+        RefreshActiveFlags();
+        RefreshFilteredNodes();
+        RefreshStatusProperties();
+    }
+
+    private async Task ClearSubscriptionNodesAsync(string message)
+    {
+        if (_isProxyEnabled)
+        {
+            DisableProxy();
+        }
+
+        _nodes.Clear();
+        _settings.ActiveNodeId = null;
+        _settings.LastSubscriptionUpdate = null;
+        SelectedNodeDetail = null;
+        await _store.SaveSettingsAsync(_settings);
+        await _store.SaveNodesAsync(_nodes);
+        SubscriptionStatus = "订阅地址为空";
+        ToastMessage = message;
+        _log.Info(message);
         RefreshActiveFlags();
         RefreshFilteredNodes();
         RefreshStatusProperties();
@@ -917,7 +953,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (showLatestDialog)
             {
                 ToastMessage = result.Message;
-                ShowDialog("已经是最新版本", result.Message, "知道了", string.Empty);
             }
             else
             {
@@ -1061,7 +1096,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void Close_Click(object sender, RoutedEventArgs e)
     {
-        Close();
+        HideToTray("已隐藏到后台，右键托盘图标可以退出。");
     }
 
     private void WindowDragArea_MouseLeftButtonDown(object sender, MouseButtonEventArgs e)
@@ -1136,6 +1171,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
                     Arguments = "/VERYSILENT /NORESTART /CLOSEAPPLICATIONS /RESTARTAPPLICATIONS",
                     UseShellExecute = true
                 });
+                _isExplicitExit = true;
                 Close();
             }
             catch (Exception ex)
@@ -1244,8 +1280,33 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Activate();
     }
 
+    private void HideToTray(string? balloonText = null)
+    {
+        Hide();
+
+        if (!string.IsNullOrWhiteSpace(balloonText))
+        {
+            _notifyIcon.BalloonTipTitle = "MyRay Lite";
+            _notifyIcon.BalloonTipText = balloonText;
+            _notifyIcon.ShowBalloonTip(1200);
+        }
+    }
+
+    private void RequestExit()
+    {
+        _isExplicitExit = true;
+        Close();
+    }
+
     private void MainWindow_Closing(object? sender, CancelEventArgs e)
     {
+        if (!_isExplicitExit)
+        {
+            e.Cancel = true;
+            HideToTray("已隐藏到后台，右键托盘图标可以退出。");
+            return;
+        }
+
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _xrayService.Stop();
@@ -1380,9 +1441,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private void BeginIntroAnimation()
     {
-        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+        BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(110))
         {
-            EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+            EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
         });
     }
 
@@ -1391,16 +1452,50 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Dispatcher.BeginInvoke(new Action(() =>
         {
             DialogCard.Opacity = 0;
-            DialogCardTransform.Y = 18;
-            DialogCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(180))
+            DialogCardTransform.Y = 10;
+            DialogCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             });
-            DialogCardTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(18, 0, TimeSpan.FromMilliseconds(220))
+            DialogCardTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(10, 0, TimeSpan.FromMilliseconds(140))
             {
-                EasingFunction = new CubicEase { EasingMode = EasingMode.EaseOut }
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             });
         }), System.Windows.Threading.DispatcherPriority.Loaded);
+    }
+
+    private void ScheduleToastAutoClose(string message)
+    {
+        _toastAutoCloseCts?.Cancel();
+        _toastAutoCloseCts?.Dispose();
+        _toastAutoCloseCts = null;
+
+        if (string.IsNullOrWhiteSpace(message))
+        {
+            return;
+        }
+
+        var cts = new CancellationTokenSource();
+        _toastAutoCloseCts = cts;
+        _ = AutoCloseToastAsync(message, cts.Token);
+    }
+
+    private async Task AutoCloseToastAsync(string message, CancellationToken cancellationToken)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromSeconds(5), cancellationToken);
+            await Dispatcher.InvokeAsync(() =>
+            {
+                if (!cancellationToken.IsCancellationRequested && string.Equals(_toastMessage, message, StringComparison.Ordinal))
+                {
+                    ToastMessage = string.Empty;
+                }
+            });
+        }
+        catch (TaskCanceledException)
+        {
+        }
     }
 
     private void UpdateTrayMenu()
@@ -1479,7 +1574,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private static Version GetCurrentVersion()
     {
-        return Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
+        var currentVersionText = GetCurrentVersionText();
+        return Version.TryParse(currentVersionText, out var version)
+            ? version
+            : Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
+    }
+
+    private static string GetCurrentVersionText()
+    {
+        var informationalVersion = Assembly.GetExecutingAssembly()
+            .GetCustomAttribute<AssemblyInformationalVersionAttribute>()
+            ?.InformationalVersion;
+
+        if (!string.IsNullOrWhiteSpace(informationalVersion))
+        {
+            return informationalVersion.Split('+', StringSplitOptions.RemoveEmptyEntries)[0];
+        }
+
+        var version = Assembly.GetExecutingAssembly().GetName().Version ?? new Version(1, 0, 0);
+        return version.Build >= 0 ? version.ToString(3) : version.ToString();
     }
 
     private void Notify([System.Runtime.CompilerServices.CallerMemberName] string? propertyName = null)

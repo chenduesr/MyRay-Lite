@@ -1,5 +1,17 @@
 # Changelog
 
+## v1.6.3
+
+### UI and Lifecycle Fixes
+
+- Update-check toast messages now close automatically after 5 seconds.
+- Checking updates when already on the latest version no longer opens a blocking dialog.
+- Clearing the subscription URL now clears the local node list, active node, and node detail drawer.
+- The sidebar version now reads the published informational version so it follows app releases correctly.
+- Clicking the window close button now hides MyRay Lite to the background instead of exiting immediately.
+- Tray menu Exit and update installation still perform a real app exit with proxy cleanup.
+- Reduced dialog and toast shadow/animation cost for smoother UI transitions.
+
 ## v1.6.2
 
 ### UI Fixes
