@@ -110,29 +110,39 @@ jobs:
             & $signtool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:SIGN_PFX_PASSWORD $installer.FullName
           }
 
+      - name: Generate release notes
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          $escapedTag = [regex]::Escape($tag)
+          $changelog = Get-Content CHANGELOG.md -Raw -Encoding UTF8
+          $match = [regex]::Match($changelog, "(?ms)^##\s+$escapedTag\s*(?<body>.*?)(?=^##\s+|\z)")
+          $changes = if ($match.Success) {
+            $match.Groups["body"].Value.Trim()
+          } else {
+            "完整变更记录见 ``CHANGELOG.md``。"
+          }
+
+          $notes = @"
+## MyRay Lite $tag
+
+Windows x64 版本，提供两种下载：
+
+- 便携版：下载 zip 后解压，运行 ``MyRayLite.exe``
+- 安装版：下载 Setup.exe，自动创建开始菜单快捷方式，可选择桌面快捷方式
+
+### 本次变更
+
+$changes
+"@
+
+          Set-Content -LiteralPath RELEASE_NOTES.md -Value $notes -Encoding UTF8
+
       - name: Upload GitHub Release
         uses: softprops/action-gh-release@v2
         with:
           name: "MyRay Lite ${{ github.ref_name }}"
-          body: |
-            ## MyRay Lite ${{ github.ref_name }}
-
-            Windows x64 版本，提供两种下载：
-
-            - 便携版：下载 zip 后解压，运行 `MyRayLite.exe`
-            - 安装版：下载 Setup.exe，自动创建开始菜单快捷方式，可选择桌面快捷方式
-
-            ### 本次重点
-
-            - 应用内检查更新现在会直接下载新版 Setup 安装包。
-            - 下载完成后可选择立即静默安装。
-            - 新增崩溃日志收集和脱敏诊断包生成。
-            - 节点列表新增测速进度明细和可编辑节点详情抽屉。
-            - 暗色模式、托盘菜单、统一弹窗和错误提示继续精修。
-            - Release workflow 支持配置代码签名证书后自动签名主程序和安装包。
-            - 应用内安装更新会尝试关闭并重启应用，失败时保留旧版本并提示回滚状态。
-
-            完整变更记录见 `CHANGELOG.md`。
+          body_path: RELEASE_NOTES.md
           files: |
             release/*.zip
             release/*.exe
