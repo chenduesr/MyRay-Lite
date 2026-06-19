@@ -124,17 +124,19 @@ jobs:
           }
 
           $notes = @"
-## MyRay Lite $tag
+          ## MyRay Lite $tag
 
-Windows x64 版本，提供两种下载：
+          Windows x64 版本，提供两种下载：
 
-- 便携版：下载 zip 后解压，运行 ``MyRayLite.exe``
-- 安装版：下载 Setup.exe，自动创建开始菜单快捷方式，可选择桌面快捷方式
+          - 便携版：下载 zip 后解压，运行 ``MyRayLite.exe``
+          - 安装版：下载 Setup.exe，自动创建开始菜单快捷方式，可选择桌面快捷方式
 
-### 本次变更
+          ### 本次变更
 
-$changes
-"@
+          $changes
+          "@
+
+          $notes = ($notes -split "`r?`n" | ForEach-Object { $_.TrimStart() }) -join "`n"
 
           Set-Content -LiteralPath RELEASE_NOTES.md -Value $notes -Encoding UTF8
 
