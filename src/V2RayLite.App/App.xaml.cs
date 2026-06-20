@@ -8,9 +8,12 @@ namespace V2RayLite.App;
 public partial class App : System.Windows.Application
 {
     private const string SingleInstanceMutexName = "MyRayLite.SingleInstance";
+    private const string ShowMainWindowEventName = "MyRayLite.ShowMainWindow";
     private readonly AppPaths _paths = new();
     private readonly CrashReportService _crashReportService;
     private Mutex? _singleInstanceMutex;
+    private EventWaitHandle? _showMainWindowEvent;
+    private bool _isExiting;
 
     public App()
     {
@@ -25,15 +28,13 @@ public partial class App : System.Windows.Application
         _singleInstanceMutex = new Mutex(initiallyOwned: true, SingleInstanceMutexName, out var createdNew);
         if (!createdNew)
         {
-            System.Windows.MessageBox.Show(
-                "MyRay Lite 已经在运行，不能重复打开第二个实例。",
-                "MyRay Lite",
-                MessageBoxButton.OK,
-                MessageBoxImage.Information);
+            SignalExistingInstance();
             Shutdown();
             return;
         }
 
+        _showMainWindowEvent = new EventWaitHandle(false, EventResetMode.AutoReset, ShowMainWindowEventName);
+        StartShowMainWindowListener();
         base.OnStartup(e);
     }
 
@@ -41,6 +42,9 @@ public partial class App : System.Windows.Application
     {
         try
         {
+            _isExiting = true;
+            _showMainWindowEvent?.Set();
+            _showMainWindowEvent?.Dispose();
             _singleInstanceMutex?.ReleaseMutex();
             _singleInstanceMutex?.Dispose();
         }
@@ -50,6 +54,63 @@ public partial class App : System.Windows.Application
         }
 
         base.OnExit(e);
+    }
+
+    private static void SignalExistingInstance()
+    {
+        try
+        {
+            using var showEvent = EventWaitHandle.OpenExisting(ShowMainWindowEventName);
+            showEvent.Set();
+        }
+        catch
+        {
+            System.Windows.MessageBox.Show(
+                "MyRay Lite 已经在运行。请从托盘图标打开主窗口。",
+                "MyRay Lite",
+                MessageBoxButton.OK,
+                MessageBoxImage.Information);
+        }
+    }
+
+    private void StartShowMainWindowListener()
+    {
+        var showEvent = _showMainWindowEvent;
+        if (showEvent is null)
+        {
+            return;
+        }
+
+        _ = Task.Run(() =>
+        {
+            while (!_isExiting)
+            {
+                try
+                {
+                    showEvent.WaitOne();
+                    if (_isExiting)
+                    {
+                        break;
+                    }
+
+                    Dispatcher.BeginInvoke(new Action(() =>
+                    {
+                        if (MainWindow is MainWindow mainWindow)
+                        {
+                            mainWindow.ShowFromTray();
+                        }
+                    }));
+                }
+                catch (ObjectDisposedException)
+                {
+                    break;
+                }
+                catch
+                {
+                    // Best effort single-instance activation.
+                }
+            }
+        });
     }
 
     private void App_DispatcherUnhandledException(object sender, DispatcherUnhandledExceptionEventArgs e)

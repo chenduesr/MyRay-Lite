@@ -358,7 +358,7 @@
                                 <Ellipse Fill="{Binding SidebarStatusBrush}" Width="10" Height="10" Margin="0,0,10,0" VerticalAlignment="Center" />
                                 <TextBlock Text="{Binding SidebarStatus}" FontSize="15" Foreground="#526174" VerticalAlignment="Center" />
                             </StackPanel>
-                            <TextBlock Grid.Column="1" Text="v1.0.0" FontSize="15" Foreground="#526174" />
+                            <TextBlock Grid.Column="1" Text="{Binding AppVersionText}" FontSize="15" Foreground="#526174" />
                         </Grid>
                         <Grid Height="34">
                             <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
