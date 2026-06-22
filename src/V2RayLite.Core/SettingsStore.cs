@@ -11,6 +11,7 @@ public sealed class SettingsStore
     };
 
     private readonly AppPaths _paths;
+    private readonly SemaphoreSlim _writeGate = new(1, 1);
 
     public SettingsStore(AppPaths paths)
     {
@@ -37,6 +38,10 @@ public sealed class SettingsStore
             }
 
             return await MigrateSettingsAsync(settings, cancellationToken);
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch
         {
@@ -113,8 +118,15 @@ public sealed class SettingsStore
     public async Task SaveSettingsAsync(AppSettings settings, CancellationToken cancellationToken = default)
     {
         _paths.Ensure();
-        await using var stream = File.Create(_paths.SettingsFile);
-        await JsonSerializer.SerializeAsync(stream, settings, JsonOptions, cancellationToken);
+        await _writeGate.WaitAsync(cancellationToken);
+        try
+        {
+            await WriteJsonAtomicallyAsync(_paths.SettingsFile, settings, cancellationToken);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
     }
 
     public async Task<List<ProxyNode>> LoadNodesAsync(CancellationToken cancellationToken = default)
@@ -131,6 +143,10 @@ public sealed class SettingsStore
             return await JsonSerializer.DeserializeAsync<List<ProxyNode>>(stream, JsonOptions, cancellationToken)
                 ?? [];
         }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
+        }
         catch
         {
             return [];
@@ -140,7 +156,53 @@ public sealed class SettingsStore
     public async Task SaveNodesAsync(IEnumerable<ProxyNode> nodes, CancellationToken cancellationToken = default)
     {
         _paths.Ensure();
-        await using var stream = File.Create(_paths.NodesFile);
-        await JsonSerializer.SerializeAsync(stream, nodes.ToList(), JsonOptions, cancellationToken);
+        var snapshot = nodes.ToList();
+        await _writeGate.WaitAsync(cancellationToken);
+        try
+        {
+            await WriteJsonAtomicallyAsync(_paths.NodesFile, snapshot, cancellationToken);
+        }
+        finally
+        {
+            _writeGate.Release();
+        }
+    }
+
+    private static async Task WriteJsonAtomicallyAsync<T>(
+        string destinationFile,
+        T value,
+        CancellationToken cancellationToken)
+    {
+        var temporaryFile = $"{destinationFile}.{Guid.NewGuid():N}.tmp";
+        try
+        {
+            await using (var stream = new FileStream(
+                             temporaryFile,
+                             FileMode.CreateNew,
+                             FileAccess.Write,
+                             FileShare.None,
+                             64 * 1024,
+                             FileOptions.Asynchronous | FileOptions.WriteThrough))
+            {
+                await JsonSerializer.SerializeAsync(stream, value, JsonOptions, cancellationToken);
+                await stream.FlushAsync(cancellationToken);
+            }
+
+            if (File.Exists(destinationFile))
+            {
+                File.Replace(temporaryFile, destinationFile, null, ignoreMetadataErrors: true);
+            }
+            else
+            {
+                File.Move(temporaryFile, destinationFile);
+            }
+        }
+        finally
+        {
+            if (File.Exists(temporaryFile))
+            {
+                File.Delete(temporaryFile);
+            }
+        }
     }
 }

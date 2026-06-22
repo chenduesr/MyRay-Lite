@@ -30,7 +30,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly SettingsStore _store;
     private readonly SubscriptionService _subscriptionService;
     private readonly XrayProcessService _xrayService;
-    private readonly SystemProxyService _systemProxyService = new();
+    private readonly SystemProxyService _systemProxyService;
     private readonly DelayTestService _delayTestService;
     private readonly DiagnosticsService _diagnosticsService;
     private readonly DiagnosticPackageService _diagnosticPackageService;
@@ -44,6 +44,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private bool _isProxyEnabled;
     private string _toastMessage = string.Empty;
     private CancellationTokenSource? _toastAutoCloseCts;
+    private CancellationTokenSource? _settingsSaveCts;
     private string _subscriptionStatus = "未更新";
     private string _searchText = string.Empty;
     private string _nodeSortKey = "Status";
@@ -77,8 +78,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var configBuilder = new XrayConfigBuilder();
         _log = new AppLogService(_paths);
         _store = new SettingsStore(_paths);
+        _systemProxyService = new SystemProxyService(_paths, _log);
         _subscriptionService = new SubscriptionService(httpClient, new SubscriptionParser(), _store);
         _xrayService = new XrayProcessService(_paths, configBuilder, _log);
+        _xrayService.UnexpectedExit += XrayService_UnexpectedExit;
         _delayTestService = new DelayTestService(_paths, configBuilder, _log);
         _diagnosticsService = new DiagnosticsService(_paths, configBuilder);
         _diagnosticPackageService = new DiagnosticPackageService(_paths);
@@ -294,6 +297,16 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private async Task LoadAsync()
     {
         _settings = await _store.LoadSettingsAsync();
+        try
+        {
+            _systemProxyService.RestoreStaleProxyIfNeeded();
+            SynchronizeStartOnBootSetting();
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"同步系统设置失败：{ex.Message}");
+        }
+
         var nodes = await _store.LoadNodesAsync();
 
         _nodes.Clear();
@@ -478,6 +491,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
         catch (Exception ex)
         {
+            _xrayService.Stop();
+            _systemProxyService.Disable();
             _isProxyEnabled = false;
             ToastMessage = ex.Message;
             RefreshLogLines();
@@ -486,6 +501,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         {
             RefreshStatusProperties();
         }
+    }
+
+    private void XrayService_UnexpectedExit(object? sender, EventArgs e)
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            _systemProxyService.Disable();
+            _isProxyEnabled = false;
+            ToastMessage = "Xray 意外退出，系统代理已恢复。";
+            RefreshLogLines();
+            RefreshStatusProperties();
+        }));
     }
 
     private void DisableProxy()
@@ -755,13 +782,20 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         await SaveAdvancedSettingsAsync();
     }
 
-    private async void AdvancedTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void AdvancedTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
-        await SaveAdvancedSettingsAsync();
+        if (_isApplyingSettings || !IsLoaded)
+        {
+            return;
+        }
+
+        ReadAdvancedSettingsFromControls();
+        ScheduleSettingsSave();
     }
 
     private async void ApplyNetworkSettings_Click(object sender, RoutedEventArgs e)
     {
+        CancelPendingSettingsSave();
         ReadAdvancedSettingsFromControls();
         await _store.SaveSettingsAsync(_settings);
 
@@ -820,16 +854,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SidebarStartupCheckBox.IsChecked = _settings.StartOnBoot;
         await _store.SaveSettingsAsync(_settings);
 
+        SynchronizeStartOnBootSetting();
+
+        ToastMessage = "开机自启设置已保存。";
+    }
+
+    private void SynchronizeStartOnBootSetting()
+    {
         var appPath = Process.GetCurrentProcess().MainModule?.FileName ?? Environment.ProcessPath ?? string.Empty;
         if (!string.IsNullOrWhiteSpace(appPath))
         {
             _systemProxyService.SetStartOnBoot(_settings.StartOnBoot, appPath);
         }
-
-        ToastMessage = "开机自启设置已保存。";
     }
 
-    private async void PortTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void PortTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (!IsLoaded)
         {
@@ -846,10 +885,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _settings.SocksPort = socksPort;
         }
 
-        await _store.SaveSettingsAsync(_settings);
+        ScheduleSettingsSave();
     }
 
-    private async void DelayTestUrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    private void DelayTestUrlTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         if (!IsLoaded)
         {
@@ -859,7 +898,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _settings.DelayTestUrl = string.IsNullOrWhiteSpace(DelayTestUrlTextBox.Text)
             ? "http://www.gstatic.com/generate_204"
             : DelayTestUrlTextBox.Text.Trim();
-        await _store.SaveSettingsAsync(_settings);
+        ScheduleSettingsSave();
     }
 
     private async void DelayTestModeComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
@@ -1292,8 +1331,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private void RequestExit()
+    private async void RequestExit()
     {
+        CancelPendingSettingsSave();
+        try
+        {
+            await _store.SaveSettingsAsync(_settings);
+        }
+        catch (Exception ex)
+        {
+            _log.Warn($"退出前保存设置失败：{ex.Message}");
+        }
+
         _isExplicitExit = true;
         Close();
     }
@@ -1307,6 +1356,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
+        CancelPendingSettingsSave();
         _notifyIcon.Visible = false;
         _notifyIcon.Dispose();
         _xrayService.Stop();
@@ -1478,6 +1528,46 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         var cts = new CancellationTokenSource();
         _toastAutoCloseCts = cts;
         _ = AutoCloseToastAsync(message, cts.Token);
+    }
+
+    private void ScheduleSettingsSave()
+    {
+        _settingsSaveCts?.Cancel();
+        var cts = new CancellationTokenSource();
+        _settingsSaveCts = cts;
+        _ = SaveSettingsAfterDelayAsync(cts);
+    }
+
+    private void CancelPendingSettingsSave()
+    {
+        _settingsSaveCts?.Cancel();
+        _settingsSaveCts = null;
+    }
+
+    private async Task SaveSettingsAfterDelayAsync(CancellationTokenSource cts)
+    {
+        try
+        {
+            await Task.Delay(TimeSpan.FromMilliseconds(400), cts.Token);
+            await _store.SaveSettingsAsync(_settings, cts.Token);
+        }
+        catch (OperationCanceledException) when (cts.IsCancellationRequested)
+        {
+        }
+        catch (Exception ex)
+        {
+            _log.Error($"自动保存设置失败：{ex.Message}");
+            ToastMessage = "设置自动保存失败，请重试。";
+        }
+        finally
+        {
+            if (ReferenceEquals(_settingsSaveCts, cts))
+            {
+                _settingsSaveCts = null;
+            }
+
+            cts.Dispose();
+        }
     }
 
     private async Task AutoCloseToastAsync(string message, CancellationToken cancellationToken)

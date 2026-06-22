@@ -11,6 +11,8 @@ public sealed class XrayProcessService
     private readonly AppLogService _log;
     private Process? _process;
     private string? _runtimeLogFile;
+    private volatile bool _isStopping;
+    private volatile bool _hasStartedSuccessfully;
 
     public XrayProcessService(AppPaths paths, XrayConfigBuilder configBuilder, AppLogService log)
     {
@@ -19,7 +21,22 @@ public sealed class XrayProcessService
         _log = log;
     }
 
-    public bool IsRunning => _process is { HasExited: false };
+    public event EventHandler? UnexpectedExit;
+
+    public bool IsRunning
+    {
+        get
+        {
+            try
+            {
+                return _process is { HasExited: false };
+            }
+            catch
+            {
+                return false;
+            }
+        }
+    }
 
     public string XrayExePath => Path.Combine(_paths.FindXrayDirectory(), "xray.exe");
 
@@ -28,6 +45,11 @@ public sealed class XrayProcessService
         if (IsRunning)
         {
             return "Xray 已在运行";
+        }
+
+        if (_process is not null)
+        {
+            Stop();
         }
 
         var exe = XrayExePath;
@@ -44,7 +66,9 @@ public sealed class XrayProcessService
         EnsurePortAvailable(settings.HttpPort, "HTTP");
         EnsurePortAvailable(settings.SocksPort, "SOCKS");
 
-        _process = new Process
+        _isStopping = false;
+        _hasStartedSuccessfully = false;
+        var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
@@ -59,24 +83,35 @@ public sealed class XrayProcessService
             EnableRaisingEvents = true
         };
 
-        _process.OutputDataReceived += (_, e) => AppendXrayLog(e.Data);
-        _process.ErrorDataReceived += (_, e) => AppendXrayLog(e.Data);
-        _process.Exited += (_, _) => _log.Warn("Xray 进程已退出。");
+        process.OutputDataReceived += (_, e) => AppendXrayLog(e.Data);
+        process.ErrorDataReceived += (_, e) => AppendXrayLog(e.Data);
+        process.Exited += (_, _) => HandleProcessExited(process);
+        _process = process;
 
-        _log.Info($"启动 Xray：{node.Name} ({node.Protocol} {node.Address}:{node.Port})");
-        _process.Start();
-        _process.BeginOutputReadLine();
-        _process.BeginErrorReadLine();
-
-        await Task.Delay(800, cancellationToken);
-        if (_process.HasExited)
+        try
         {
-            var issue = XrayErrorAdvisor.Analyze(ReadRuntimeLogTail());
-            _log.Error($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
-            throw new InvalidOperationException($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
-        }
+            _log.Info($"启动 Xray：{node.Name} ({node.Protocol} {node.Address}:{node.Port})");
+            process.Start();
+            process.BeginOutputReadLine();
+            process.BeginErrorReadLine();
 
-        return "Xray 已启动";
+            await Task.Delay(800, cancellationToken);
+            _hasStartedSuccessfully = true;
+            if (process.HasExited)
+            {
+                _hasStartedSuccessfully = false;
+                var issue = XrayErrorAdvisor.Analyze(ReadRuntimeLogTail());
+                _log.Error($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
+                throw new InvalidOperationException($"Xray 启动失败：{issue.Title}。{issue.Suggestion}");
+            }
+
+            return "Xray 已启动";
+        }
+        catch
+        {
+            Stop();
+            throw;
+        }
     }
 
     public void Stop()
@@ -88,6 +123,8 @@ public sealed class XrayProcessService
 
         try
         {
+            _isStopping = true;
+            _hasStartedSuccessfully = false;
             if (!_process.HasExited)
             {
                 _log.Info("正在停止 Xray。");
@@ -103,6 +140,20 @@ public sealed class XrayProcessService
         {
             _process.Dispose();
             _process = null;
+            _isStopping = false;
+        }
+    }
+
+    private void HandleProcessExited(Process process)
+    {
+        var isUnexpected = !_isStopping
+            && _hasStartedSuccessfully
+            && ReferenceEquals(_process, process);
+
+        _log.Warn(isUnexpected ? "Xray 进程意外退出。" : "Xray 进程已退出。");
+        if (isUnexpected)
+        {
+            UnexpectedExit?.Invoke(this, EventArgs.Empty);
         }
     }
 

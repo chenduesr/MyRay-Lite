@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.5
+
+### Reliability and Privacy
+
+- Diagnostic packages now structurally redact node credentials and never include an unredacted generated configuration when sanitization fails.
+- Xray unexpected exits now restore the previous Windows proxy settings and update the application state.
+- Windows proxy settings are backed up before MyRay Lite changes them and restored on disconnect, exit, or the next launch after an abnormal termination.
+- Settings and node data are now serialized through a write lock and committed with atomic file replacement.
+- Frequently edited network fields use delayed saves to avoid overlapping writes.
+- Empty or unsupported subscription responses preserve the last working node cache.
+- Custom block, direct, and proxy rules now take priority over built-in geographic routing rules.
+- The configured startup preference is synchronized with the Windows startup registry when the app launches.
+
+### Release
+
+- Release builds now validate the Git tag against the project version and inject the same version into both the app and installer.
+- A second launch reliably restores the existing hidden window.
+- The sidebar version is read from the real published application version.
+
 ## v1.6.3
 
 ### UI and Lifecycle Fixes

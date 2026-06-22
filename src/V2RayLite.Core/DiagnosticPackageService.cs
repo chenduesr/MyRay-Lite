@@ -1,5 +1,6 @@
 using System.IO.Compression;
 using System.Text.Json;
+using System.Text.Json.Nodes;
 
 namespace V2RayLite.Core;
 
@@ -129,9 +130,65 @@ public sealed class DiagnosticPackageService
 
     private static string RedactText(string value)
     {
-        return value
-            .Replace("password", "password_redacted", StringComparison.OrdinalIgnoreCase)
-            .Replace("uuid", "uuid_redacted", StringComparison.OrdinalIgnoreCase);
+        try
+        {
+            var root = JsonNode.Parse(value);
+            if (root is null)
+            {
+                return "{\"redactionError\":\"Generated config was empty.\"}";
+            }
+
+            RedactJsonNode(root);
+            return root.ToJsonString(new JsonSerializerOptions { WriteIndented = true });
+        }
+        catch
+        {
+            // Never include the original text when redaction cannot be guaranteed.
+            return "{\"redactionError\":\"Generated config could not be safely redacted.\"}";
+        }
+    }
+
+    private static void RedactJsonNode(JsonNode node)
+    {
+        if (node is JsonObject obj)
+        {
+            foreach (var property in obj.ToList())
+            {
+                if (IsSensitiveJsonKey(property.Key))
+                {
+                    obj[property.Key] = "[redacted]";
+                }
+                else if (property.Value is not null)
+                {
+                    RedactJsonNode(property.Value);
+                }
+            }
+
+            return;
+        }
+
+        if (node is JsonArray array)
+        {
+            foreach (var item in array)
+            {
+                if (item is not null)
+                {
+                    RedactJsonNode(item);
+                }
+            }
+        }
+    }
+
+    private static bool IsSensitiveJsonKey(string key)
+    {
+        return key.Equals("id", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("uuid", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("password", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("user", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("pass", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("email", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("token", StringComparison.OrdinalIgnoreCase)
+            || key.Equals("obfsPassword", StringComparison.OrdinalIgnoreCase);
     }
 
     private static string RedactUrl(string value)

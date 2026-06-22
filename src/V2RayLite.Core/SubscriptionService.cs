@@ -28,9 +28,28 @@ public sealed class SubscriptionService
             response.EnsureSuccessStatusCode();
             var payload = await response.Content.ReadAsStringAsync(cancellationToken);
             var nodes = _parser.Parse(payload).ToList();
-            settings.LastSubscriptionUpdate = DateTimeOffset.Now;
-            await _store.SaveSettingsAsync(settings, cancellationToken);
+            if (nodes.Count == 0)
+            {
+                return new SubscriptionSnapshot
+                {
+                    Nodes = await _store.LoadNodesAsync(cancellationToken),
+                    LastUpdated = settings.LastSubscriptionUpdate,
+                    StatusText = "未解析到有效节点，已保留原节点"
+                };
+            }
+
             await _store.SaveNodesAsync(nodes, cancellationToken);
+            var previousUpdate = settings.LastSubscriptionUpdate;
+            settings.LastSubscriptionUpdate = DateTimeOffset.Now;
+            try
+            {
+                await _store.SaveSettingsAsync(settings, cancellationToken);
+            }
+            catch
+            {
+                settings.LastSubscriptionUpdate = previousUpdate;
+                throw;
+            }
 
             return new SubscriptionSnapshot
             {
@@ -38,6 +57,10 @@ public sealed class SubscriptionService
                 LastUpdated = settings.LastSubscriptionUpdate,
                 StatusText = nodes.Count > 0 ? "正常" : "订阅为空"
             };
+        }
+        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        {
+            throw;
         }
         catch (Exception ex)
         {

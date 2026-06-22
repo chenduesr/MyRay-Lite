@@ -467,6 +467,8 @@ public sealed class XrayConfigBuilder
         if (mode == ProxyMode.Rule)
         {
             AddCustomRoutingRule(rules, "block", ParseList(settings.BlockDomains), ParseList(settings.BlockIps));
+            AddCustomRoutingRule(rules, "direct", ParseList(settings.DirectDomains), ParseList(settings.DirectIps));
+            AddCustomRoutingRule(rules, "proxy", ParseList(settings.ProxyDomains), ParseList(settings.ProxyIps));
 
             if (settings.BypassMainland)
             {
@@ -482,9 +484,6 @@ public sealed class XrayConfigBuilder
                     domains: ["geosite:geolocation-!cn"],
                     ips: []);
             }
-
-            AddCustomRoutingRule(rules, "direct", ParseList(settings.DirectDomains), ParseList(settings.DirectIps));
-            AddCustomRoutingRule(rules, "proxy", ParseList(settings.ProxyDomains), ParseList(settings.ProxyIps));
 
             var finalOutbound = settings.RoutingRuleMode == RoutingRuleMode.Whitelist ? "direct" : "proxy";
             rules.Add(new JsonObject

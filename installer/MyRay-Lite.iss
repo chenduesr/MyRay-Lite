@@ -1,5 +1,7 @@
 #define MyAppName "MyRay Lite"
-#define MyAppVersion "1.6.3"
+#ifndef MyAppVersion
+  #error MyAppVersion must be supplied by the release build.
+#endif
 #define MyAppPublisher "MyRay Lite"
 #define MyAppExeName "MyRayLite.exe"
 

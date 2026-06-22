@@ -21,6 +21,23 @@ jobs:
         with:
           dotnet-version: "10.0.x"
 
+      - name: Resolve and validate release version
+        shell: pwsh
+        run: |
+          $tag = "${{ github.ref_name }}"
+          if ($tag -notmatch '^v(?<version>\d+\.\d+\.\d+)$') {
+            throw "Release tag must use vMAJOR.MINOR.PATCH format: $tag"
+          }
+
+          $version = $Matches.version
+          [xml]$project = Get-Content src/V2RayLite.App/V2RayLite.App.csproj -Raw
+          $declaredVersion = [string]($project.Project.PropertyGroup.Version | Select-Object -First 1)
+          if ($declaredVersion -ne $version) {
+            throw "Tag version $version does not match project version $declaredVersion."
+          }
+
+          "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+
       - name: Publish self-contained app
         shell: pwsh
         run: |
@@ -29,6 +46,7 @@ jobs:
             -r win-x64 `
             --self-contained true `
             -p:NuGetAudit=false `
+            -p:Version="$env:RELEASE_VERSION" `
             -o publish/MyRay-Lite-win-x64
 
       - name: Download Xray-core
@@ -85,7 +103,7 @@ jobs:
           $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           if (-not (Test-Path $iscc)) { $iscc = "${env:ProgramFiles}\Inno Setup 6\ISCC.exe" }
           if (-not (Test-Path $iscc)) { throw "ISCC.exe not found." }
-          & $iscc installer/MyRay-Lite.iss
+          & $iscc "/DMyAppVersion=$env:RELEASE_VERSION" installer/MyRay-Lite.iss
 
       - name: Sign installer if certificate is configured
         shell: pwsh
