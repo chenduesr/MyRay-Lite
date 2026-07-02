@@ -38,6 +38,10 @@ jobs:
 
           "RELEASE_VERSION=$version" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
 
+      - name: Run core tests
+        shell: pwsh
+        run: dotnet run --project tests/V2RayLite.Core.Tests/V2RayLite.Core.Tests.csproj -c Release
+
       - name: Publish self-contained app
         shell: pwsh
         run: |
@@ -128,6 +132,15 @@ jobs:
             & $signtool.FullName sign /fd SHA256 /td SHA256 /tr http://timestamp.digicert.com /f $pfx /p $env:SIGN_PFX_PASSWORD $installer.FullName
           }
 
+      - name: Generate SHA256 checksums
+        shell: pwsh
+        run: |
+          $lines = Get-ChildItem release -File | Where-Object { $_.Name -ne "sha256.txt" } | Sort-Object Name | ForEach-Object {
+            $hash = Get-FileHash -Algorithm SHA256 -LiteralPath $_.FullName
+            "$($hash.Hash.ToLowerInvariant())  $($_.Name)"
+          }
+          Set-Content -LiteralPath release/sha256.txt -Value $lines -Encoding utf8NoBOM
+
       - name: Generate release notes
         shell: pwsh
         run: |
@@ -166,3 +179,4 @@ jobs:
           files: |
             release/*.zip
             release/*.exe
+            release/sha256.txt

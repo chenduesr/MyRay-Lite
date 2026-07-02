@@ -28,8 +28,8 @@ public sealed class DiagnosticPackageService
         AddText(archive, "settings.redacted.json", JsonSerializer.Serialize(RedactSettings(settings), new JsonSerializerOptions { WriteIndented = true }));
         AddText(archive, "nodes.redacted.json", JsonSerializer.Serialize(nodes.Select(RedactNode).ToList(), new JsonSerializerOptions { WriteIndented = true }));
 
-        AddFiles(archive, _paths.LogDirectory, "logs", "*.log", 8);
-        AddFiles(archive, _paths.CrashDirectory, "crashes", "*.log", 8);
+        AddFiles(archive, _paths.LogDirectory, "logs", "*.log", AppLogService.MaxRetainedLogFiles);
+        AddFiles(archive, _paths.CrashDirectory, "crashes", "*.log", AppLogService.MaxRetainedLogFiles);
 
         if (File.Exists(_paths.GeneratedConfigFile))
         {

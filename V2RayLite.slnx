@@ -3,4 +3,7 @@
     <Project Path="src/V2RayLite.App/V2RayLite.App.csproj" />
     <Project Path="src/V2RayLite.Core/V2RayLite.Core.csproj" />
   </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/V2RayLite.Core.Tests/V2RayLite.Core.Tests.csproj" />
+  </Folder>
 </Solution>

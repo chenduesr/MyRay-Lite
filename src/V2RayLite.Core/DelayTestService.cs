@@ -139,8 +139,13 @@ public sealed class DelayTestService
             return ProbeResult.Fail(DelayFailureKind.MissingCore, "未找到 xray.exe，请先下载核心。");
         }
 
-        var httpPort = GetFreeTcpPort();
-        var socksPort = GetFreeTcpPort();
+        if (!TryReserveTcpPorts(2, out var ports, out var portReservations, out var portFailureReason))
+        {
+            return ProbeResult.Fail(DelayFailureKind.PortUnavailable, portFailureReason);
+        }
+
+        var httpPort = ports[0];
+        var socksPort = ports[1];
         var tempSettings = new AppSettings
         {
             HttpPort = httpPort,
@@ -156,6 +161,8 @@ public sealed class DelayTestService
         try
         {
             await File.WriteAllTextAsync(configFile, _configBuilder.Build(node, tempSettings), cancellationToken);
+            ReleasePortReservations(portReservations);
+            portReservations.Clear();
             process = StartXray(exe, configFile, logFile);
             await Task.Delay(900, cancellationToken);
 
@@ -179,6 +186,7 @@ public sealed class DelayTestService
         finally
         {
             StopProcess(process);
+            ReleasePortReservations(portReservations);
             DeleteFile(configFile);
         }
     }
@@ -196,7 +204,12 @@ public sealed class DelayTestService
             return;
         }
 
-        var ports = nodes.Select(_ => GetFreeTcpPort()).ToList();
+        if (!TryReserveTcpPorts(nodes.Count, out var ports, out var portReservations, out var portFailureReason))
+        {
+            MarkBatchUnavailable(nodes, DelayFailureKind.PortUnavailable, portFailureReason, onNodeUpdated);
+            return;
+        }
+
         _paths.Ensure();
         var configFile = Path.Combine(_paths.AppDataRoot, $"xray-probe-batch-{Guid.NewGuid():N}.json");
         var logFile = Path.Combine(_paths.LogDirectory, $"xray-probe-batch-{DateTime.Now:yyyyMMdd-HHmmss}.log");
@@ -205,6 +218,8 @@ public sealed class DelayTestService
         try
         {
             await File.WriteAllTextAsync(configFile, _configBuilder.BuildBatchDelayTest(nodes, ports), cancellationToken);
+            ReleasePortReservations(portReservations);
+            portReservations.Clear();
             process = StartXray(exe, configFile, logFile);
             await Task.Delay(1200, cancellationToken);
 
@@ -234,6 +249,7 @@ public sealed class DelayTestService
         finally
         {
             StopProcess(process);
+            ReleasePortReservations(portReservations);
             DeleteFile(configFile);
         }
     }
@@ -507,15 +523,51 @@ public sealed class DelayTestService
         }
     }
 
-    private static int GetFreeTcpPort()
+    private static bool TryReserveTcpPorts(int count, out List<int> ports, out List<TcpListener> reservations, out string failureReason)
     {
-        var listener = new TcpListener(IPAddress.Loopback, 0);
-        listener.Start();
-        var port = ((IPEndPoint)listener.LocalEndpoint).Port;
-        listener.Stop();
-        return port;
+        ports = [];
+        reservations = [];
+        failureReason = string.Empty;
+
+        try
+        {
+            for (var index = 0; index < count; index++)
+            {
+                var listener = new TcpListener(IPAddress.Loopback, 0);
+                listener.Start();
+                var port = ((IPEndPoint)listener.LocalEndpoint).Port;
+                ports.Add(port);
+                reservations.Add(listener);
+            }
+
+            return true;
+        }
+        catch (Exception ex)
+        {
+            ReleasePortReservations(reservations);
+            ports.Clear();
+            reservations.Clear();
+            failureReason = $"无法分配临时测速端口：{ex.Message}";
+            return false;
+        }
     }
 
+    private static void ReleasePortReservations(ICollection<TcpListener> reservations)
+    {
+        foreach (var listener in reservations.ToList())
+        {
+            try
+            {
+                listener.Stop();
+            }
+            catch
+            {
+                // Best effort.
+            }
+        }
+
+        reservations.Clear();
+    }
     private static void AppendProbeLog(string file, string? line)
     {
         if (string.IsNullOrWhiteSpace(line))
@@ -525,7 +577,7 @@ public sealed class DelayTestService
 
         try
         {
-            File.AppendAllText(file, line + Environment.NewLine);
+            AppLogService.AppendLineWithRotation(file, line);
         }
         catch
         {

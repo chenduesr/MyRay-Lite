@@ -1,5 +1,24 @@
 # Changelog
 
+## v1.6.6
+
+### Stability
+
+- Added 5 MB log rotation with five retained files for app, runtime Xray, and probe logs.
+- Diagnostic packages now include only the most recent retained log files.
+- Batch delay tests now reserve temporary local ports before generating Xray probe configs to avoid duplicate or occupied ports.
+- Port allocation failures are reported as a dedicated delay-test failure reason.
+
+### Verification
+
+- Added a dependency-free core test project covering subscription links, Clash YAML, Xray config generation, routing order, diagnostic redaction, log rotation, and update checksum verification.
+- Release builds now run the core tests before publishing artifacts.
+
+### Update Safety
+
+- Release builds now publish a `sha256.txt` checksum file for the portable ZIP and Setup installer.
+- In-app update downloads now require and verify the installer SHA256 before offering installation.
+
 ## v1.6.5
 
 ### Reliability and Privacy

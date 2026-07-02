@@ -1,4 +1,4 @@
-﻿<Project Sdk="Microsoft.NET.Sdk">
+<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>WinExe</OutputType>
@@ -10,7 +10,7 @@
     <ApplicationIcon>Assets\app.ico</ApplicationIcon>
     <AssemblyName>MyRayLite</AssemblyName>
     <Product>MyRay Lite</Product>
-    <Version>1.6.5</Version>
+    <Version>1.6.6</Version>
   </PropertyGroup>
 
   <ItemGroup>
