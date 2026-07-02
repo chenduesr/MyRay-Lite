@@ -1,5 +1,4 @@
 using System.Net.Http.Json;
-using System.Security.Cryptography;
 using System.Text.Json.Serialization;
 
 namespace V2RayLite.Core;
@@ -45,12 +44,6 @@ public sealed class UpdateCheckService
             return new UpdateCheckResult(false, latest.TagName, latest.HtmlUrl, null, null, "最新版本号格式无法识别。");
         }
 
-        var checksumAsset = latest.Assets.FirstOrDefault(asset =>
-            asset.Name.Equals("sha256.txt", StringComparison.OrdinalIgnoreCase));
-        var checksums = checksumAsset is null
-            ? new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase)
-            : await ReadChecksumsAsync(checksumAsset.DownloadUrl, cancellationToken).ConfigureAwait(false);
-
         var hasUpdate = latestVersion > currentVersion;
         var message = hasUpdate
             ? $"发现新版本 {latest.TagName}。"
@@ -60,12 +53,12 @@ public sealed class UpdateCheckService
         var installer = latest.Assets
             .Where(asset => asset.Name.EndsWith(".exe", StringComparison.OrdinalIgnoreCase) &&
                             asset.Name.Contains("Setup", StringComparison.OrdinalIgnoreCase))
-            .Select(asset => ToReleaseAsset(asset, checksums))
+            .Select(ToReleaseAsset)
             .FirstOrDefault();
         var portable = latest.Assets
             .Where(asset => asset.Name.EndsWith(".zip", StringComparison.OrdinalIgnoreCase) &&
                             asset.Name.Contains("win-x64", StringComparison.OrdinalIgnoreCase))
-            .Select(asset => ToReleaseAsset(asset, checksums))
+            .Select(ToReleaseAsset)
             .FirstOrDefault();
 
         return new UpdateCheckResult(
@@ -86,11 +79,6 @@ public sealed class UpdateCheckService
         if (string.IsNullOrWhiteSpace(asset.DownloadUrl))
         {
             throw new InvalidOperationException("更新安装包下载地址为空。");
-        }
-
-        if (string.IsNullOrWhiteSpace(asset.Sha256))
-        {
-            throw new InvalidOperationException("Release 未提供安装包 SHA256 校验值，已停止下载以保护安全。");
         }
 
         paths.Ensure();
@@ -129,18 +117,11 @@ public sealed class UpdateCheckService
                 }
             }
 
-            var actualHash = ComputeSha256(tempFile);
-            if (!string.Equals(actualHash, NormalizeSha256(asset.Sha256), StringComparison.OrdinalIgnoreCase))
-            {
-                DeleteFileIfExists(tempFile);
-                throw new InvalidOperationException($"安装包 SHA256 校验失败。期望 {asset.Sha256}，实际 {actualHash}。");
-            }
-
             DeleteFileIfExists(outputFile);
             File.Move(tempFile, outputFile);
 
             progress?.Report(1);
-            _log.Info($"更新安装包已下载并通过 SHA256 校验：{outputFile}");
+            _log.Info($"更新安装包已下载：{outputFile}");
             return outputFile;
         }
         catch
@@ -150,63 +131,10 @@ public sealed class UpdateCheckService
         }
     }
 
-    private async Task<IReadOnlyDictionary<string, string>> ReadChecksumsAsync(
-        string downloadUrl,
-        CancellationToken cancellationToken)
-    {
-        var checksums = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
-        if (string.IsNullOrWhiteSpace(downloadUrl))
-        {
-            return checksums;
-        }
-
-        try
-        {
-            using var request = new HttpRequestMessage(HttpMethod.Get, downloadUrl);
-            request.Headers.UserAgent.ParseAdd("MyRayLite/1.0");
-            var text = await _httpClient.SendAsync(request, cancellationToken).ConfigureAwait(false);
-            text.EnsureSuccessStatusCode();
-            var body = await text.Content.ReadAsStringAsync(cancellationToken).ConfigureAwait(false);
-
-            foreach (var rawLine in body.Replace("\r", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            {
-                var parts = rawLine.Split([' ', '\t'], StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
-                if (parts.Length < 2)
-                {
-                    continue;
-                }
-
-                var hash = NormalizeSha256(parts[0]);
-                var name = parts[^1].TrimStart('*');
-                if (hash.Length == 64 && !string.IsNullOrWhiteSpace(name))
-                {
-                    checksums[name] = hash;
-                }
-            }
-        }
-        catch (Exception ex)
-        {
-            _log.Warn($"读取 Release SHA256 校验文件失败：{ex.Message}");
-        }
-
-        return checksums;
-    }
-
     private static Version? ParseVersion(string value)
     {
         var normalized = value.Trim().TrimStart('v', 'V');
         return Version.TryParse(normalized, out var version) ? version : null;
-    }
-
-    private static string ComputeSha256(string file)
-    {
-        using var stream = File.OpenRead(file);
-        return Convert.ToHexString(SHA256.HashData(stream)).ToLowerInvariant();
-    }
-
-    private static string NormalizeSha256(string value)
-    {
-        return value.Trim().TrimStart('\uFEFF').Replace("-", string.Empty).ToLowerInvariant();
     }
 
     private static void DeleteFileIfExists(string file)
@@ -248,15 +176,13 @@ public sealed class UpdateCheckService
         public long Size { get; set; }
     }
 
-    private static ReleaseAsset ToReleaseAsset(GitHubReleaseAsset asset, IReadOnlyDictionary<string, string> checksums)
+    private static ReleaseAsset ToReleaseAsset(GitHubReleaseAsset asset)
     {
-        checksums.TryGetValue(asset.Name, out var sha256);
         return new ReleaseAsset
         {
             Name = asset.Name,
             DownloadUrl = asset.DownloadUrl,
-            Size = asset.Size,
-            Sha256 = sha256
+            Size = asset.Size
         };
     }
 }

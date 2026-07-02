@@ -1,6 +1,4 @@
 using System.IO.Compression;
-using System.Net;
-using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Nodes;
@@ -14,7 +12,6 @@ var tests = new (string Name, Func<Task> Body)[]
     ("routing order", () => { TestRoutingOrder(); return Task.CompletedTask; }),
     ("diagnostic redaction and recent logs", () => { TestDiagnosticPackageRedactionAndRecentLogs(); return Task.CompletedTask; }),
     ("log rotation", () => { TestLogRotation(); return Task.CompletedTask; }),
-    ("update sha256 verification", TestUpdateSha256VerificationAsync)
 };
 
 var failures = 0;
@@ -199,45 +196,6 @@ static void TestLogRotation()
     }
 }
 
-static async Task TestUpdateSha256VerificationAsync()
-{
-    var root = CreateTempRoot();
-    try
-    {
-        var bytes = Encoding.UTF8.GetBytes("installer-bytes");
-        var hash = Convert.ToHexString(SHA256.HashData(bytes)).ToLowerInvariant();
-        using var httpClient = new HttpClient(new StaticBytesHandler(bytes));
-        var service = new UpdateCheckService(httpClient, new AppLogService(new AppPaths(root)));
-        var paths = new AppPaths(root);
-        var output = await service.DownloadInstallerAsync(
-            new ReleaseAsset
-            {
-                Name = "MyRay-Lite-v1.6.6-Setup.exe",
-                DownloadUrl = "https://example.test/setup.exe",
-                Size = bytes.Length,
-                Sha256 = hash
-            },
-            paths);
-
-        True(File.Exists(output), "Installer was not written after checksum verification.");
-        Equal(hash, Convert.ToHexString(SHA256.HashData(File.ReadAllBytes(output))).ToLowerInvariant());
-
-        await ThrowsAsync<InvalidOperationException>(() => service.DownloadInstallerAsync(
-            new ReleaseAsset
-            {
-                Name = "bad.exe",
-                DownloadUrl = "https://example.test/bad.exe",
-                Size = bytes.Length,
-                Sha256 = new string('0', 64)
-            },
-            paths));
-    }
-    finally
-    {
-        DeleteDirectory(root);
-    }
-}
-
 static ProxyNode SampleVlessNode()
 {
     return new ProxyNode
@@ -304,37 +262,4 @@ static void True(bool condition, string message)
 static void False(bool condition, string message)
 {
     True(!condition, message);
-}
-
-static async Task ThrowsAsync<TException>(Func<Task> action)
-    where TException : Exception
-{
-    try
-    {
-        await action();
-    }
-    catch (TException)
-    {
-        return;
-    }
-
-    throw new InvalidOperationException($"Expected exception {typeof(TException).Name}.");
-}
-
-sealed class StaticBytesHandler : HttpMessageHandler
-{
-    private readonly byte[] _bytes;
-
-    public StaticBytesHandler(byte[] bytes)
-    {
-        _bytes = bytes;
-    }
-
-    protected override Task<HttpResponseMessage> SendAsync(HttpRequestMessage request, CancellationToken cancellationToken)
-    {
-        return Task.FromResult(new HttpResponseMessage(HttpStatusCode.OK)
-        {
-            Content = new ByteArrayContent(_bytes)
-        });
-    }
 }

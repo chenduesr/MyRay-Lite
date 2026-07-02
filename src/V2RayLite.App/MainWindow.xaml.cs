@@ -126,6 +126,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public MediaBrush SidebarStatusBrush => Brush(_isProxyEnabled ? "#2BCB66" : "#94A3B8");
     public string ActiveNodeName => ActiveNode?.Name ?? "未选择";
     public string ActiveNodeDelay => ActiveNode?.DisplayDelay ?? "—";
+    public string XrayStatusText => _xrayService.IsRunning ? "运行中" : "未运行";
+    public string SystemProxyStatusText => _isProxyEnabled ? "已启用" : "未启用";
+    public string HomeStatusTitle => _isProxyEnabled ? "代理运行中" : "代理未开启";
+    public string HomeStatusDetail => _isProxyEnabled
+        ? "Xray 与系统代理正在工作，流量会按当前模式处理。"
+        : ActiveNode is null
+            ? "请先更新订阅并选择节点，然后开启代理。"
+            : "节点已准备好，点击下方按钮即可开启代理。";
     public bool HasActiveNode => ActiveNode is not null;
     public string ProxyModeText => _settings.ProxyMode switch
     {
@@ -476,7 +484,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
-            ToastMessage = "正在启动 Xray...";
+            SetToast("正在连接", ActiveNodeName);
             await _xrayService.StartAsync(ActiveNode!, _settings);
             if (enableSystemProxy)
             {
@@ -484,7 +492,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             }
 
             _isProxyEnabled = true;
-            ToastMessage = "代理已开启。";
+            SetToast("连接成功", $"{ActiveNodeName} · {ProxyModeText}");
             _notifyIcon.BalloonTipTitle = "MyRay Lite";
             _notifyIcon.BalloonTipText = $"已连接：{ActiveNodeName}";
             _notifyIcon.ShowBalloonTip(1000);
@@ -494,7 +502,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _xrayService.Stop();
             _systemProxyService.Disable();
             _isProxyEnabled = false;
-            ToastMessage = ex.Message;
+            SetToast("连接失败", ex.Message);
             RefreshLogLines();
         }
         finally
@@ -502,28 +510,25 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             RefreshStatusProperties();
         }
     }
-
     private void XrayService_UnexpectedExit(object? sender, EventArgs e)
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
             _systemProxyService.Disable();
             _isProxyEnabled = false;
-            ToastMessage = "Xray 意外退出，系统代理已恢复。";
+            SetToast("连接已断开", "Xray 意外退出，系统代理已恢复");
             RefreshLogLines();
             RefreshStatusProperties();
         }));
     }
-
     private void DisableProxy()
     {
         _xrayService.Stop();
         _systemProxyService.Disable();
         _isProxyEnabled = false;
-        ToastMessage = "代理已关闭。";
+        SetToast("代理已关闭", "系统代理已恢复");
         RefreshStatusProperties();
     }
-
     private void SwitchNode_Click(object sender, RoutedEventArgs e)
     {
         if (_nodes.Count == 0)
@@ -561,7 +566,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshActiveFlags();
         RefreshFilteredNodes();
         RefreshStatusProperties();
-        ToastMessage = $"已选择 {node.Name}";
+        SetToast("已选择节点", node.Name);
 
         if (reconnect)
         {
@@ -593,7 +598,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             return;
         }
 
-        ToastMessage = "正在更新订阅...";
+        SetToast("正在更新订阅");
         SubscriptionStatus = "更新中";
         _log.Info("开始更新订阅。");
 
@@ -611,7 +616,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
 
         SubscriptionStatus = snapshot.StatusText;
-        ToastMessage = snapshot.StatusText;
+        SetToast("订阅更新完成", $"{snapshot.Nodes.Count} 个节点 · {snapshot.StatusText}");
         _log.Info($"订阅更新完成：{snapshot.StatusText}，节点 {snapshot.Nodes.Count} 个。");
         RefreshActiveFlags();
         RefreshFilteredNodes();
@@ -652,7 +657,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
     private async void TestAllNodes_Click(object sender, RoutedEventArgs e)
     {
-        ToastMessage = "正在测速...";
+        SetToast("正在测速", $"{_nodes.Count} 个节点");
         IsTestingNodes = true;
         TestProgress = 0;
         TestProgressDetail = "正在准备批量测速...";
@@ -676,16 +681,17 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             var available = _nodes.Count(node => node.Status == NodeStatus.Available);
             var unavailable = _nodes.Count(node => node.Status == NodeStatus.Unavailable);
             var unsupported = _nodes.Count(node => !node.IsSupportedByXray);
-            ToastMessage = unsupported > 0
-                ? $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。"
-                : $"{DelayTestModeText}完成：可用 {available}，不可用 {unavailable}。";
+            var testSummary = unsupported > 0
+                ? $"可用 {available}，不可用 {unavailable}，不支持 {unsupported}"
+                : $"可用 {available}，不可用 {unavailable}";
+            SetToast($"{DelayTestModeText}完成", testSummary);
             TestProgress = 1;
             TestProgressDetail = $"完成：可用 {available}，不可用 {unavailable}，不支持 {unsupported}。";
             RefreshLogLines();
         }
         catch (Exception ex)
         {
-            ToastMessage = $"测速失败：{ex.Message}";
+            SetToast("测速失败", ex.Message);
             TestProgressDetail = $"测速失败：{ex.Message}";
             _log.Error(ToastMessage);
             ShowDialog("测速失败", ex.Message, "知道了", string.Empty);
@@ -707,7 +713,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
 
         RefreshFilteredNodes();
         RefreshStatusProperties();
-        ToastMessage = delay is null ? $"节点不可用：{node.DisplayFailureReason}" : $"{node.DisplayTestType} {node.DisplayDelay}。";
+        if (delay is null)
+        {
+            SetToast("节点不可用", node.DisplayFailureReason);
+        }
+        else
+        {
+            SetToast("测速完成", $"{node.DisplayTestType} {node.DisplayDelay}");
+        }
         RefreshLogLines();
     }
 
@@ -1431,6 +1444,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         Notify(nameof(SidebarStatusBrush));
         Notify(nameof(ActiveNodeName));
         Notify(nameof(ActiveNodeDelay));
+        Notify(nameof(XrayStatusText));
+        Notify(nameof(SystemProxyStatusText));
+        Notify(nameof(HomeStatusTitle));
+        Notify(nameof(HomeStatusDetail));
         Notify(nameof(HasActiveNode));
         Notify(nameof(ProxyModeText));
         Notify(nameof(NodeCount));
@@ -1514,6 +1531,12 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    private void SetToast(string title, string? detail = null)
+    {
+        ToastMessage = string.IsNullOrWhiteSpace(detail)
+            ? title
+            : $"{title} · {detail}";
+    }
     private void ScheduleToastAutoClose(string message)
     {
         _toastAutoCloseCts?.Cancel();

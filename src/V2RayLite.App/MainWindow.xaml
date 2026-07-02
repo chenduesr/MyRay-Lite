@@ -404,42 +404,33 @@
                                 </StackPanel>
                             </Button>
 
-                            <StackPanel Grid.Row="3" Margin="0,40,0,0">
-                                <Border Style="{StaticResource Card}" Width="640" HorizontalAlignment="Center" Padding="28,22">
-                                    <Grid>
-                                        <Grid.ColumnDefinitions>
-                                            <ColumnDefinition Width="46" />
-                                            <ColumnDefinition Width="150" />
-                                            <ColumnDefinition Width="*" />
-                                        </Grid.ColumnDefinitions>
-                                        <Grid.RowDefinitions>
-                                            <RowDefinition Height="56" />
-                                            <RowDefinition Height="56" />
-                                            <RowDefinition Height="56" />
-                                            <RowDefinition Height="56" />
-                                        </Grid.RowDefinitions>
-                                        <TextBlock Grid.Row="0" Style="{StaticResource IconText}" Text="&#xE707;" Foreground="{StaticResource BlueBrush}" />
-                                        <TextBlock Grid.Row="0" Grid.Column="1" Text="当前节点：" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Row="0" Grid.Column="2" Text="{Binding ActiveNodeName}" FontSize="20" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" TextTrimming="CharacterEllipsis" />
-                                        <Border Grid.Row="0" Grid.Column="1" Grid.ColumnSpan="2" Background="{StaticResource LineBrush}" Height="1" VerticalAlignment="Bottom" />
-
-                                        <TextBlock Grid.Row="1" Style="{StaticResource IconText}" Text="&#xE916;" Foreground="#18AE4D" />
-                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="延迟：" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Row="1" Grid.Column="2" Text="{Binding ActiveNodeDelay}" FontSize="20" Foreground="#18AE4D" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                        <Border Grid.Row="1" Grid.Column="1" Grid.ColumnSpan="2" Background="{StaticResource LineBrush}" Height="1" VerticalAlignment="Bottom" />
-
-                                        <TextBlock Grid.Row="2" Style="{StaticResource IconText}" Text="&#xE9D9;" Foreground="#635BFF" />
-                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="模式：" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Row="2" Grid.Column="2" Text="{Binding ProxyModeText}" FontSize="20" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                        <Border Grid.Row="2" Grid.Column="1" Grid.ColumnSpan="2" Background="{StaticResource LineBrush}" Height="1" VerticalAlignment="Bottom" />
-
-                                        <TextBlock Grid.Row="3" Style="{StaticResource IconText}" Text="&#xE8B7;" Foreground="{StaticResource BlueBrush}" />
-                                        <TextBlock Grid.Row="3" Grid.Column="1" Text="协议核心：" FontSize="20" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                        <TextBlock Grid.Row="3" Grid.Column="2" Text="Xray" FontSize="20" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" VerticalAlignment="Center" HorizontalAlignment="Right" />
-                                    </Grid>
+                            <StackPanel Grid.Row="3" Margin="0,36,0,0">
+                                <Border Style="{StaticResource Card}" Width="720" HorizontalAlignment="Center" Padding="24,22">
+                                    <StackPanel>
+                                        <Grid Margin="0,0,0,18">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="*" />
+                                                <ColumnDefinition Width="Auto" />
+                                            </Grid.ColumnDefinitions>
+                                            <StackPanel>
+                                                <TextBlock Text="{Binding HomeStatusTitle}" FontSize="22" FontWeight="Bold" Foreground="{Binding RuntimeStatusBrush}" />
+                                                <TextBlock Text="{Binding HomeStatusDetail}" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap" />
+                                            </StackPanel>
+                                            <Border Grid.Column="1" Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="18" Padding="16,7" VerticalAlignment="Top">
+                                                <TextBlock Text="{Binding RuntimeStatus}" FontSize="15" FontWeight="SemiBold" Foreground="{Binding RuntimeStatusBrush}" />
+                                            </Border>
+                                        </Grid>
+                                        <UniformGrid Columns="2" Rows="3">
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,10"><StackPanel><TextBlock Text="当前节点" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeName}" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,10"><StackPanel><TextBlock Text="延迟" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeDelay}" FontSize="19" Foreground="#18AE4D" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,10"><StackPanel><TextBlock Text="代理模式" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ProxyModeText}" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,10"><StackPanel><TextBlock Text="Xray 状态" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding XrayStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,0"><StackPanel><TextBlock Text="系统代理" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding SystemProxyStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,0"><StackPanel><TextBlock Text="核心" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="Xray-core" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                        </UniformGrid>
+                                    </StackPanel>
                                 </Border>
-
-                                <UniformGrid Columns="3" Rows="1" Width="640" HorizontalAlignment="Center" Margin="0,26,0,0">
+                                <UniformGrid Columns="3" Rows="1" Width="720" HorizontalAlignment="Center" Margin="0,24,0,0">
                                     <Button Style="{StaticResource OutlineButton}" Height="54" Margin="0,0,12,0" Click="SwitchNode_Click" Content="切换节点" />
                                     <Button Style="{StaticResource OutlineButton}" Height="54" Margin="6,0" Click="UpdateSubscription_Click" Content="更新订阅" />
                                     <Button Style="{StaticResource OutlineButton}" Height="54" Margin="12,0,0,0" Click="TestActiveNode_Click" Content="测试延迟" />
@@ -627,7 +618,8 @@
                         <StackPanel Margin="0,0,0,32">
                             <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                                 <StackPanel>
-                                    <TextBlock Text="代理模式" FontSize="21" FontWeight="Bold" Margin="0,0,0,24" />
+                                    <TextBlock Text="代理" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
+                                    <TextBlock Text="选择系统代理模式。端口和测速放在下方高级设置里。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,18" />
                                     <UniformGrid Columns="3">
                                         <RadioButton x:Name="RuleModeRadio" Content="规则模式" GroupName="ProxyMode" Checked="ProxyMode_Checked" Tag="Rule" />
                                         <RadioButton x:Name="GlobalModeRadio" Content="全局模式" GroupName="ProxyMode" Checked="ProxyMode_Checked" Tag="Global" />
@@ -638,7 +630,8 @@
 
                             <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                                 <StackPanel>
-                                    <TextBlock Text="系统设置" FontSize="21" FontWeight="Bold" Margin="0,0,0,18" />
+                                    <TextBlock Text="基础" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
+                                    <TextBlock Text="启动、托盘和显示相关选项。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,16" />
                                     <CheckBox x:Name="StartOnBootCheckBox" Content="开机自启" Margin="0,8" Click="StartupCheckBox_Click" />
                                     <Border Height="1" Background="{StaticResource LineBrush}" />
                                     <CheckBox x:Name="AutoConnectCheckBox" Content="启动后自动连接" Margin="0,8" Click="SettingsCheckBox_Click" />
@@ -654,7 +647,7 @@
                             <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,18">
-                                        <TextBlock Text="路由规则" FontSize="21" FontWeight="Bold" VerticalAlignment="Center" />
+                                        <StackPanel><TextBlock Text="路由" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" /><TextBlock Text="自定义直连、代理和阻断规则。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /></StackPanel>
                                         <Button Content="应用网络设置" Style="{StaticResource OutlineButton}" Width="150" Height="42" HorizontalAlignment="Right" Click="ApplyNetworkSettings_Click" />
                                     </Grid>
                                     <Grid Margin="0,0,0,16">
@@ -701,7 +694,8 @@
 
                             <Border Style="{StaticResource Card}" Margin="0,0,0,18">
                                 <StackPanel>
-                                    <TextBlock Text="DNS 设置" FontSize="21" FontWeight="Bold" Margin="0,0,0,18" />
+                                    <TextBlock Text="DNS" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
+                                    <TextBlock Text="配置自定义 DNS、FakeDNS 和国内外分流。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,18" />
                                     <UniformGrid Columns="3" Margin="0,0,0,16">
                                         <CheckBox x:Name="EnableCustomDnsCheckBox" Content="自定义 DNS" Click="AdvancedSettings_Changed" />
                                         <CheckBox x:Name="EnableFakeDnsCheckBox" Content="FakeDNS" Click="AdvancedSettings_Changed" />
@@ -737,19 +731,21 @@
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
                                         <RowDefinition Height="58" />
                                     </Grid.RowDefinitions>
-                                    <TextBlock Text="HTTP:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBox x:Name="HttpPortTextBox" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
-                                    <TextBlock Grid.Row="1" Text="SOCKS:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBox x:Name="SocksPortTextBox" Grid.Row="1" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
-                                    <TextBlock Grid.Row="2" Text="测速URL:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <TextBox x:Name="DelayTestUrlTextBox" Grid.Row="2" Grid.Column="1" TextChanged="DelayTestUrlTextBox_TextChanged" />
-                                    <TextBlock Grid.Row="3" Text="测速模式:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
-                                    <ComboBox x:Name="DelayTestModeComboBox" Grid.Row="3" Grid.Column="1" Height="46" FontSize="16" SelectionChanged="DelayTestModeComboBox_SelectionChanged">
+                                    <StackPanel Grid.ColumnSpan="2" Margin="0,0,0,14"><TextBlock Text="高级" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" /><TextBlock Text="本地端口、测速地址和测速方式。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /></StackPanel>
+                                    <TextBlock Grid.Row="1" Text="HTTP:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox x:Name="HttpPortTextBox" Grid.Row="1" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="2" Text="SOCKS:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox x:Name="SocksPortTextBox" Grid.Row="2" Grid.Column="1" TextChanged="PortTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="3" Text="测速URL:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBox x:Name="DelayTestUrlTextBox" Grid.Row="3" Grid.Column="1" TextChanged="DelayTestUrlTextBox_TextChanged" />
+                                    <TextBlock Grid.Row="4" Text="测速模式:" FontSize="18" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <ComboBox x:Name="DelayTestModeComboBox" Grid.Row="4" Grid.Column="1" Height="46" FontSize="16" SelectionChanged="DelayTestModeComboBox_SelectionChanged">
                                         <ComboBoxItem Content="TCP 延迟：最快，接近 v2rayN 列表延迟" />
                                         <ComboBoxItem Content="HTTP 延迟：真实经过 Xray 代理访问测速 URL" />
                                         <ComboBoxItem Content="下载测速：真实经过 Xray 代理读取 1 MB 数据" />
@@ -765,7 +761,8 @@
                                         <ColumnDefinition Width="132" />
                                     </Grid.ColumnDefinitions>
                                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="协议核心：" FontSize="18" FontWeight="SemiBold" />
+                                        <TextBlock Text="更新" FontSize="20" FontWeight="Bold" Margin="0,0,18,0" />
+                                        <TextBlock Text="核心：" FontSize="18" FontWeight="SemiBold" />
                                         <TextBlock Text="Xray" FontSize="18" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="14,0,0,0" />
                                         <TextBlock Text="{Binding AppVersionText}" FontSize="16" Foreground="{StaticResource SubtleTextBrush}" Margin="18,1,0,0" />
                                     </StackPanel>

@@ -1,5 +1,18 @@
 # Changelog
 
+## v1.7.0
+
+### UI Polish
+
+- Refined the Home page status card so current node, delay, proxy mode, Xray status, and Windows system proxy status are shown as clear status tiles.
+- Reorganized the Settings page into clearer sections: Basic, Proxy, Routing, DNS, Advanced, and Update.
+- Unified key toast messages for connection, disconnection, subscription updates, and delay testing.
+
+### Release
+
+- Removed the v1.6.6 SHA256 release asset and in-app installer checksum requirement.
+- Update downloads now use the existing direct installer download flow without requiring `sha256.txt`.
+
 ## v1.6.6
 
 ### Stability
