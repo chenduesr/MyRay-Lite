@@ -103,6 +103,16 @@ public sealed class AppSettings
     public string DotDns { get; set; } = "tls://1.1.1.1";
     public string? ActiveNodeId { get; set; }
     public DateTimeOffset? LastSubscriptionUpdate { get; set; }
+    public string TrafficDate { get; set; } = DateTimeOffset.Now.ToString("yyyy-MM-dd");
+    public long TodayUploadBytes { get; set; }
+    public long TodayDownloadBytes { get; set; }
+}
+
+public sealed class NetworkTrafficSnapshot
+{
+    public long UploadBytes { get; set; }
+    public long DownloadBytes { get; set; }
+    public DateTimeOffset Timestamp { get; set; } = DateTimeOffset.Now;
 }
 
 public sealed class ReleaseAsset

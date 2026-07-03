@@ -10,6 +10,7 @@ using System.Windows.Controls;
 using System.Windows.Input;
 using System.Windows.Media;
 using System.Windows.Media.Animation;
+using System.Windows.Threading;
 using V2RayLite.Core;
 using MediaBrush = System.Windows.Media.Brush;
 using MediaColor = System.Windows.Media.Color;
@@ -36,6 +37,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private readonly DiagnosticPackageService _diagnosticPackageService;
     private readonly XrayDownloadService _downloadService;
     private readonly UpdateCheckService _updateCheckService;
+    private readonly NetworkTrafficService _trafficService = new();
+    private readonly DispatcherTimer _runtimeTimer;
     private readonly ObservableCollection<ProxyNode> _nodes = [];
     private readonly WinForms.NotifyIcon _notifyIcon;
 
@@ -47,10 +50,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private CancellationTokenSource? _settingsSaveCts;
     private string _subscriptionStatus = "未更新";
     private string _searchText = string.Empty;
+    private string _logSearchText = string.Empty;
+    private string _logLevelFilter = "全部";
+    private bool _logAutoScroll = true;
+    private string _settingsSection = "Basic";
     private string _nodeSortKey = "Status";
     private bool _nodeSortAscending;
     private bool _isApplyingSettings;
     private bool _isTestingNodes;
+    private bool _isConnecting;
     private bool _isExplicitExit;
     private double _testProgress;
     private string _testProgressDetail = "等待开始测速";
@@ -68,6 +76,14 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private WinForms.ToolStripMenuItem? _traySwitchNodeItem;
     private WinForms.ContextMenuStrip? _trayMenu;
     private string? _latestReleaseUrl;
+    private DateTimeOffset? _connectedAt;
+    private NetworkTrafficSnapshot? _lastTrafficSnapshot;
+    private double _downloadBytesPerSecond;
+    private double _uploadBytesPerSecond;
+    private int _trafficSaveTick;
+    private string _xrayCoreVersionText = "未检测";
+    private string _xrayLatestVersionText = "未检查";
+    private string _geoDataStatusText = "未检测";
 
     public MainWindow()
     {
@@ -88,6 +104,9 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _downloadService = new XrayDownloadService(httpClient, _paths);
         _updateCheckService = new UpdateCheckService(httpClient, _log);
         _notifyIcon = CreateNotifyIcon();
+        _runtimeTimer = new DispatcherTimer { Interval = TimeSpan.FromSeconds(1) };
+        _runtimeTimer.Tick += (_, _) => UpdateRuntimeMetrics();
+        _runtimeTimer.Start();
 
         Opacity = 0;
         Loaded += async (_, _) =>
@@ -101,7 +120,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public event PropertyChangedEventHandler? PropertyChanged;
 
     public ObservableCollection<ProxyNode> FilteredNodes { get; } = [];
-    public ObservableCollection<string> LogLines { get; } = [];
+    public ObservableCollection<LogLineItem> LogLines { get; } = [];
 
     public string CurrentPage
     {
@@ -128,12 +147,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public string ActiveNodeDelay => ActiveNode?.DisplayDelay ?? "—";
     public string XrayStatusText => _xrayService.IsRunning ? "运行中" : "未运行";
     public string SystemProxyStatusText => _isProxyEnabled ? "已启用" : "未启用";
-    public string HomeStatusTitle => _isProxyEnabled ? "代理运行中" : "代理未开启";
-    public string HomeStatusDetail => _isProxyEnabled
-        ? "Xray 与系统代理正在工作，流量会按当前模式处理。"
-        : ActiveNode is null
-            ? "请先更新订阅并选择节点，然后开启代理。"
-            : "节点已准备好，点击下方按钮即可开启代理。";
+    public string HomeStatusTitle => _isConnecting ? "正在连接" : _isProxyEnabled ? "代理运行中" : "代理未开启";
+    public string HomeStatusDetail => _isConnecting
+        ? "正在启动核心并设置系统代理，请稍等。"
+        : _isProxyEnabled
+            ? "Xray 与系统代理正在工作，流量会按当前模式处理。"
+            : ActiveNode is null
+                ? "请先更新订阅并选择节点，然后开启代理。"
+                : "节点已准备好，点击下方按钮即可开启代理。";
+    public string ConnectionFlowTitle => _isConnecting ? "连接中" : _isProxyEnabled ? "已连接" : "未连接";
+    public string ConnectionFlowDetail => _isConnecting
+        ? "正在启动 Xray Core → 写入代理端口 → 启用系统代理"
+        : _isProxyEnabled
+            ? $"{ActiveNodeName} · {ProxyModeText} · 已运行 {ConnectionDurationText}"
+            : ActiveNode is null ? "先添加/更新订阅，再选择一个节点。" : "节点已就绪，可以直接开启代理。";
+    public string ConnectionDurationText => _connectedAt is null ? "00:00:00" : (DateTimeOffset.Now - _connectedAt.Value).ToString(@"hh\:mm\:ss");
+    public string CurrentDownloadSpeedText => $"↓ {FormatTrafficSpeed(_downloadBytesPerSecond)}";
+    public string CurrentUploadSpeedText => $"↑ {FormatTrafficSpeed(_uploadBytesPerSecond)}";
+    public string TodayTrafficText => FormatTrafficBytes(_settings.TodayDownloadBytes + _settings.TodayUploadBytes);
+    public string TrafficHintText => _isProxyEnabled ? "基于本机网卡计数器估算" : "连接后开始统计";
+    public string XrayCoreVersionText => _xrayCoreVersionText;
+    public string XrayLatestVersionText => _xrayLatestVersionText;
+    public string GeoDataStatusText => _geoDataStatusText;
     public bool HasActiveNode => ActiveNode is not null;
     public string ProxyModeText => _settings.ProxyMode switch
     {
@@ -146,6 +181,28 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool HasNodes => FilteredNodes.Count > 0;
     public bool HasLogs => LogLines.Count > 0;
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
+    public bool IsLogSearchEmpty => string.IsNullOrWhiteSpace(_logSearchText);
+
+    public bool LogAutoScroll
+    {
+        get => _logAutoScroll;
+        set
+        {
+            _logAutoScroll = value;
+            Notify();
+        }
+    }
+
+    public string SettingsSection
+    {
+        get => _settingsSection;
+        set
+        {
+            if (_settingsSection == value) return;
+            _settingsSection = value;
+            Notify();
+        }
+    }
     public string AppVersionText => $"v{GetCurrentVersionText()}";
     public string EmptyNodesTitle => _nodes.Count == 0 ? "暂无节点" : "没有匹配节点";
     public string EmptyNodesMessage => _nodes.Count == 0 ? "请在订阅页保存并更新订阅" : "换个关键词，或点击刷新重新加载列表";
@@ -232,10 +289,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _selectedNodeDetail = value;
             Notify();
             Notify(nameof(IsNodeDetailOpen));
+            Notify(nameof(SelectedNodeEndpointText));
+            Notify(nameof(SelectedNodeTransportText));
+            Notify(nameof(SelectedNodeSubscriptionText));
+            Notify(nameof(SelectedNodeLastTestText));
         }
     }
 
     public bool IsNodeDetailOpen => SelectedNodeDetail is not null;
+    public string SelectedNodeEndpointText => SelectedNodeDetail is null ? "—" : $"{SelectedNodeDetail.Address}:{SelectedNodeDetail.Port}";
+    public string SelectedNodeTransportText => SelectedNodeDetail is null ? "—" : $"{SelectedNodeDetail.Network} / {SelectedNodeDetail.Security}";
+    public string SelectedNodeSubscriptionText => BuildSubscriptionSourceText();
+    public string SelectedNodeLastTestText => SelectedNodeDetail?.LastTested?.ToLocalTime().ToString("yyyy-MM-dd HH:mm:ss") ?? "未测速";
     public bool IsDialogOpen
     {
         get => _isDialogOpen;
@@ -328,6 +393,8 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _settings.ActiveNodeId = _nodes[0].Id;
         }
 
+        ResetTrafficDateIfNeeded();
+        RefreshXrayCoreInfo();
         ApplySettingsToControls();
         ApplyTheme();
         RefreshActiveFlags();
@@ -484,14 +551,21 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     {
         try
         {
+            _isConnecting = true;
+            RefreshStatusProperties();
             SetToast("正在连接", ActiveNodeName);
             await _xrayService.StartAsync(ActiveNode!, _settings);
             if (enableSystemProxy)
             {
+                SetToast("正在设置系统代理", $"HTTP {_settings.HttpPort} · SOCKS {_settings.SocksPort}");
                 _systemProxyService.Enable(_settings);
             }
 
             _isProxyEnabled = true;
+            _connectedAt = DateTimeOffset.Now;
+            _lastTrafficSnapshot = _trafficService.Sample();
+            _downloadBytesPerSecond = 0;
+            _uploadBytesPerSecond = 0;
             SetToast("连接成功", $"{ActiveNodeName} · {ProxyModeText}");
             _notifyIcon.BalloonTipTitle = "MyRay Lite";
             _notifyIcon.BalloonTipText = $"已连接：{ActiveNodeName}";
@@ -502,15 +576,18 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _xrayService.Stop();
             _systemProxyService.Disable();
             _isProxyEnabled = false;
+            _connectedAt = null;
+            _downloadBytesPerSecond = 0;
+            _uploadBytesPerSecond = 0;
             SetToast("连接失败", ex.Message);
             RefreshLogLines();
         }
         finally
         {
+            _isConnecting = false;
             RefreshStatusProperties();
         }
-    }
-    private void XrayService_UnexpectedExit(object? sender, EventArgs e)
+    }    private void XrayService_UnexpectedExit(object? sender, EventArgs e)
     {
         Dispatcher.BeginInvoke(new Action(() =>
         {
@@ -824,6 +901,52 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private void ValidateRoutingRules_Click(object sender, RoutedEventArgs e)
+    {
+        ReadAdvancedSettingsFromControls();
+        var errors = new List<string>();
+        ValidateRuleLines("直连域名", _settings.DirectDomains, false, errors);
+        ValidateRuleLines("直连 IP", _settings.DirectIps, true, errors);
+        ValidateRuleLines("代理域名", _settings.ProxyDomains, false, errors);
+        ValidateRuleLines("代理 IP", _settings.ProxyIps, true, errors);
+        ValidateRuleLines("阻止域名", _settings.BlockDomains, false, errors);
+        ValidateRuleLines("阻止 IP", _settings.BlockIps, true, errors);
+
+        if (errors.Count == 0)
+        {
+            SetToast("规则校验通过", "可以保存并应用网络设置");
+            return;
+        }
+
+        ShowDialog("规则格式需要检查", string.Join(Environment.NewLine, errors.Take(8)), "知道了", string.Empty);
+    }
+
+    private static void ValidateRuleLines(string label, string value, bool ipRule, List<string> errors)
+    {
+        var lineNumber = 0;
+        foreach (var raw in value.Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries))
+        {
+            lineNumber++;
+            var line = raw.Trim();
+            if (line.StartsWith("#") || line.Length == 0)
+            {
+                continue;
+            }
+
+            var valid = ipRule
+                ? line.Contains('.') || line.Contains(':') || line.StartsWith("geoip:", StringComparison.OrdinalIgnoreCase)
+                : line.StartsWith("domain:", StringComparison.OrdinalIgnoreCase) ||
+                  line.StartsWith("geosite:", StringComparison.OrdinalIgnoreCase) ||
+                  line.StartsWith("regexp:", StringComparison.OrdinalIgnoreCase) ||
+                  line.StartsWith("full:", StringComparison.OrdinalIgnoreCase) ||
+                  line.StartsWith("keyword:", StringComparison.OrdinalIgnoreCase) ||
+                  line.Contains('.');
+            if (!valid)
+            {
+                errors.Add($"{label} 第 {lineNumber} 行格式可疑：{line}");
+            }
+        }
+    }
     private async Task SaveAdvancedSettingsAsync()
     {
         if (_isApplyingSettings || !IsLoaded)
@@ -947,24 +1070,121 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
     }
 
+    private void LogSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
+    {
+        _logSearchText = LogSearchTextBox.Text.Trim();
+        Notify(nameof(IsLogSearchEmpty));
+        RefreshLogLines();
+    }
+
+    private void LogLevelComboBox_SelectionChanged(object sender, SelectionChangedEventArgs e)
+    {
+        if (!IsLoaded)
+        {
+            return;
+        }
+
+        _logLevelFilter = (LogLevelComboBox.SelectedItem as ComboBoxItem)?.Content?.ToString() ?? "全部";
+        RefreshLogLines();
+    }
+
+    private void LogAutoScroll_Click(object sender, RoutedEventArgs e)
+    {
+        LogAutoScroll = LogAutoScrollCheckBox.IsChecked == true;
+        if (LogAutoScroll)
+        {
+            ScrollLogsToEnd();
+        }
+    }
+
+    private void CopyLogs_Click(object sender, RoutedEventArgs e)
+    {
+        if (LogLines.Count == 0)
+        {
+            SetToast("暂无日志", "没有可复制的日志内容");
+            return;
+        }
+
+        WpfClipboard.SetText(string.Join(Environment.NewLine, LogLines.Select(line => line.Text)));
+        SetToast("日志已复制", $"已复制 {LogLines.Count} 行");
+    }
+
+    private void SettingsSection_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: string section })
+        {
+            SettingsSection = section;
+        }
+    }
     private async void DownloadXray_Click(object sender, RoutedEventArgs e)
+    {
+        await UpdateXrayCoreAsync();
+    }
+
+    private async void CheckXrayCore_Click(object sender, RoutedEventArgs e)
     {
         try
         {
-            ToastMessage = "正在下载 Xray-core...";
-            var progress = new Progress<double>(value => ToastMessage = $"正在下载 Xray-core {value:P0}");
-            var directory = await _downloadService.DownloadLatestWindowsX64Async(progress);
-            ToastMessage = $"Xray-core 已下载到 {directory}";
-            _log.Info($"Xray-core 已下载到 {directory}");
+            SetToast("正在检查 Xray-core");
+            _xrayLatestVersionText = await _downloadService.CheckLatestVersionAsync();
+            Notify(nameof(XrayLatestVersionText));
+            SetToast("Xray-core 检查完成", $"最新版本：{_xrayLatestVersionText}");
         }
         catch (Exception ex)
         {
-            ToastMessage = $"下载失败：{ex.Message}";
+            SetToast("检查 Xray-core 失败", ex.Message);
             _log.Error(ToastMessage);
             RefreshLogLines();
         }
     }
 
+    private async void UpdateXrayCore_Click(object sender, RoutedEventArgs e)
+    {
+        await UpdateXrayCoreAsync();
+    }
+
+    private async void UpdateGeoData_Click(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            SetToast("正在更新 geoip/geosite 数据");
+            var progress = new Progress<double>(value => SetToast("正在更新 geo 数据", value.ToString("P0")));
+            var directory = await _downloadService.DownloadLatestGeoDataAsync(progress);
+            RefreshXrayCoreInfo();
+            SetToast("geo 数据已更新", directory);
+            _log.Info($"geoip/geosite 数据已更新到 {directory}");
+        }
+        catch (Exception ex)
+        {
+            SetToast("geo 数据更新失败", ex.Message);
+            _log.Error(ToastMessage);
+            RefreshLogLines();
+        }
+    }
+
+    private async Task UpdateXrayCoreAsync()
+    {
+        try
+        {
+            if (_isProxyEnabled)
+            {
+                DisableProxy();
+            }
+
+            SetToast("正在下载 Xray-core...");
+            var progress = new Progress<double>(value => SetToast("正在下载 Xray-core", value.ToString("P0")));
+            var directory = await _downloadService.DownloadLatestWindowsX64Async(progress);
+            RefreshXrayCoreInfo();
+            SetToast("Xray-core 已更新", directory);
+            _log.Info($"Xray-core 已更新到 {directory}");
+        }
+        catch (Exception ex)
+        {
+            SetToast("Xray-core 更新失败", ex.Message);
+            _log.Error(ToastMessage);
+            RefreshLogLines();
+        }
+    }
     private async void CheckUpdate_Click(object sender, RoutedEventArgs e)
     {
         try
@@ -1167,6 +1387,39 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
+    private async void ConnectSelectedNode_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedNodeDetail is null)
+        {
+            return;
+        }
+
+        await SetActiveNodeAsync(SelectedNodeDetail, reconnect: _isProxyEnabled);
+        if (!_isProxyEnabled)
+        {
+            CurrentPage = "Home";
+        }
+    }
+
+    private async void TestSelectedNode_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedNodeDetail is not null)
+        {
+            await TestNodeAsync(SelectedNodeDetail);
+            Notify(nameof(SelectedNodeLastTestText));
+        }
+    }
+
+    private void CopyNodeName_Click(object sender, RoutedEventArgs e)
+    {
+        if (SelectedNodeDetail is null)
+        {
+            return;
+        }
+
+        WpfClipboard.SetText(SelectedNodeDetail.Name);
+        SetToast("节点名称已复制", SelectedNodeDetail.Name);
+    }
     private async void SaveNodeDetails_Click(object sender, RoutedEventArgs e)
     {
         if (SelectedNodeDetail is null)
@@ -1276,6 +1529,29 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         return $"{mb:0.0} MB";
     }
 
+    private static string FormatTrafficBytes(long bytes)
+    {
+        if (bytes <= 0)
+        {
+            return "0 B";
+        }
+
+        string[] units = ["B", "KB", "MB", "GB", "TB"];
+        var value = (double)bytes;
+        var unit = 0;
+        while (value >= 1024 && unit < units.Length - 1)
+        {
+            value /= 1024;
+            unit++;
+        }
+
+        return $"{value:0.##} {units[unit]}";
+    }
+
+    private static string FormatTrafficSpeed(double bytesPerSecond)
+    {
+        return $"{FormatTrafficBytes((long)Math.Max(0, bytesPerSecond))}/s";
+    }
     private void WritePendingUpdateMarker(string installerPath)
     {
         _paths.Ensure();
@@ -1323,7 +1599,32 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         }
     }
 
-    private sealed record PendingUpdateMarker(string PreviousVersion, string InstallerPath, DateTimeOffset StartedAt);
+    public sealed class LogLineItem
+{
+    public string Text { get; init; } = string.Empty;
+    public string Level { get; init; } = "INFO";
+    public MediaBrush Foreground => Level switch
+    {
+        "ERROR" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#EF4444")),
+        "WARN" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#F97316")),
+        "XRAY" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#7C3AED")),
+        _ => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#263445"))
+    };
+
+    public static LogLineItem From(string line)
+    {
+        var level = line.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("error", StringComparison.OrdinalIgnoreCase)
+            ? "ERROR"
+            : line.Contains("[WARN]", StringComparison.OrdinalIgnoreCase) || line.Contains("warning", StringComparison.OrdinalIgnoreCase)
+                ? "WARN"
+                : line.Contains("xray", StringComparison.OrdinalIgnoreCase) || line.StartsWith("=====") || !line.StartsWith("[")
+                    ? "XRAY"
+                    : "INFO";
+
+        return new LogLineItem { Text = line, Level = level };
+    }
+}
+private sealed record PendingUpdateMarker(string PreviousVersion, string InstallerPath, DateTimeOffset StartedAt);
 
     public void ShowFromTray()
     {
@@ -1376,6 +1677,93 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         _systemProxyService.Disable();
     }
 
+    private void UpdateRuntimeMetrics()
+    {
+        Notify(nameof(ConnectionDurationText));
+        Notify(nameof(ConnectionFlowDetail));
+
+        if (!_isProxyEnabled)
+        {
+            if (_downloadBytesPerSecond != 0 || _uploadBytesPerSecond != 0)
+            {
+                _downloadBytesPerSecond = 0;
+                _uploadBytesPerSecond = 0;
+                NotifyTrafficProperties();
+            }
+            return;
+        }
+
+        ResetTrafficDateIfNeeded();
+        var current = _trafficService.Sample();
+        if (_lastTrafficSnapshot is not null)
+        {
+            var seconds = Math.Max(0.1, (current.Timestamp - _lastTrafficSnapshot.Timestamp).TotalSeconds);
+            var downloadDelta = Math.Max(0, current.DownloadBytes - _lastTrafficSnapshot.DownloadBytes);
+            var uploadDelta = Math.Max(0, current.UploadBytes - _lastTrafficSnapshot.UploadBytes);
+            _downloadBytesPerSecond = downloadDelta / seconds;
+            _uploadBytesPerSecond = uploadDelta / seconds;
+            _settings.TodayDownloadBytes += downloadDelta;
+            _settings.TodayUploadBytes += uploadDelta;
+            _trafficSaveTick++;
+            if (_trafficSaveTick >= 20)
+            {
+                _trafficSaveTick = 0;
+                _ = _store.SaveSettingsAsync(_settings);
+            }
+        }
+
+        _lastTrafficSnapshot = current;
+        NotifyTrafficProperties();
+    }
+
+    private void NotifyTrafficProperties()
+    {
+        Notify(nameof(CurrentDownloadSpeedText));
+        Notify(nameof(CurrentUploadSpeedText));
+        Notify(nameof(TodayTrafficText));
+        Notify(nameof(TrafficHintText));
+    }
+
+    private void ResetTrafficDateIfNeeded()
+    {
+        var today = DateTimeOffset.Now.ToString("yyyy-MM-dd");
+        if (string.Equals(_settings.TrafficDate, today, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        _settings.TrafficDate = today;
+        _settings.TodayUploadBytes = 0;
+        _settings.TodayDownloadBytes = 0;
+    }
+
+    private void RefreshXrayCoreInfo()
+    {
+        _xrayCoreVersionText = _downloadService.GetInstalledVersionText();
+        _geoDataStatusText = _downloadService.GetGeoDataStatusText();
+        Notify(nameof(XrayCoreVersionText));
+        Notify(nameof(GeoDataStatusText));
+    }
+
+    private string BuildSubscriptionSourceText()
+    {
+        if (string.IsNullOrWhiteSpace(_settings.SubscriptionUrl))
+        {
+            return "本地/手动节点";
+        }
+
+        try
+        {
+            var first = _settings.SubscriptionUrl
+                .Split(new[] { '\r', '\n' }, StringSplitOptions.RemoveEmptyEntries)
+                .FirstOrDefault() ?? _settings.SubscriptionUrl;
+            return Uri.TryCreate(first.Trim(), UriKind.Absolute, out var uri) ? uri.Host : "当前订阅";
+        }
+        catch
+        {
+            return "当前订阅";
+        }
+    }
     private void RefreshFilteredNodes()
     {
         FilteredNodes.Clear();
@@ -1410,15 +1798,40 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private void RefreshLogLines()
     {
         LogLines.Clear();
-        foreach (var line in _log.ReadRecentLines())
+        foreach (var line in _log.ReadRecentLines().Where(MatchesLogFilter))
         {
-            LogLines.Add(line);
+            LogLines.Add(LogLineItem.From(line));
         }
 
         Notify(nameof(LogLines));
         Notify(nameof(HasLogs));
+        if (LogAutoScroll)
+        {
+            ScrollLogsToEnd();
+        }
     }
 
+    private bool MatchesLogFilter(string line)
+    {
+        if (!string.IsNullOrWhiteSpace(_logSearchText) && !line.Contains(_logSearchText, StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
+        return _logLevelFilter switch
+        {
+            "ERROR" => line.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("error", StringComparison.OrdinalIgnoreCase),
+            "WARN" => line.Contains("[WARN]", StringComparison.OrdinalIgnoreCase) || line.Contains("warning", StringComparison.OrdinalIgnoreCase),
+            "INFO" => line.Contains("[INFO]", StringComparison.OrdinalIgnoreCase),
+            "XRAY" => line.Contains("xray", StringComparison.OrdinalIgnoreCase) || line.StartsWith("=====") || !line.StartsWith("["),
+            _ => true
+        };
+    }
+
+    private void ScrollLogsToEnd()
+    {
+        Dispatcher.BeginInvoke(new Action(() => LogsScrollViewer?.ScrollToEnd()), DispatcherPriority.Background);
+    }
     private bool MatchesSearch(ProxyNode node)
     {
         return string.IsNullOrWhiteSpace(_searchText)

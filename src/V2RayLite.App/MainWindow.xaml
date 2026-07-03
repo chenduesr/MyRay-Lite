@@ -426,7 +426,7 @@
                                             <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,10"><StackPanel><TextBlock Text="代理模式" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ProxyModeText}" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
                                             <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,10"><StackPanel><TextBlock Text="Xray 状态" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding XrayStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
                                             <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,0"><StackPanel><TextBlock Text="系统代理" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding SystemProxyStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,0"><StackPanel><TextBlock Text="核心" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="Xray-core" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
+                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,0"><StackPanel><TextBlock Text="核心" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding XrayCoreVersionText}" FontSize="15" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
                                         </UniformGrid>
                                     </StackPanel>
                                 </Border>
@@ -610,13 +610,22 @@
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Settings}">
                         <Grid Width="860" HorizontalAlignment="Center" Margin="0,10,0,0">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="86" />
+                                <RowDefinition Height="78" />
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="设置" Style="{StaticResource PageTitleText}" Margin="0,0,0,16" />
-                            <ScrollViewer Grid.Row="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <TextBlock Text="设置" Style="{StaticResource PageTitleText}" Margin="0,0,0,12" />
+                            <UniformGrid Grid.Row="1" Columns="6" Rows="1" Margin="0,0,0,16">
+                                <Button Content="基础" Tag="Basic" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,6,0" Click="SettingsSection_Click" />
+                                <Button Content="代理" Tag="Proxy" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
+                                <Button Content="路由" Tag="Routing" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
+                                <Button Content="DNS" Tag="Dns" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
+                                <Button Content="高级" Tag="Advanced" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
+                                <Button Content="更新" Tag="Update" Style="{StaticResource OutlineButton}" Height="42" Margin="6,0,0,0" Click="SettingsSection_Click" />
+                            </UniformGrid>
+                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,0,32">
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Proxy}">
                                 <StackPanel>
                                     <TextBlock Text="代理" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
                                     <TextBlock Text="选择系统代理模式。端口和测速放在下方高级设置里。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,18" />
@@ -628,7 +637,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Basic}">
                                 <StackPanel>
                                     <TextBlock Text="基础" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
                                     <TextBlock Text="启动、托盘和显示相关选项。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,16" />
@@ -644,11 +653,14 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Routing}">
                                 <StackPanel>
                                     <Grid Margin="0,0,0,18">
                                         <StackPanel><TextBlock Text="路由" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" /><TextBlock Text="自定义直连、代理和阻断规则。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /></StackPanel>
-                                        <Button Content="应用网络设置" Style="{StaticResource OutlineButton}" Width="150" Height="42" HorizontalAlignment="Right" Click="ApplyNetworkSettings_Click" />
+<StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
+                                            <Button Content="校验规则" Style="{StaticResource OutlineButton}" Width="120" Height="42" Margin="0,0,10,0" Click="ValidateRoutingRules_Click" />
+                                            <Button Content="应用网络设置" Style="{StaticResource OutlineButton}" Width="150" Height="42" Click="ApplyNetworkSettings_Click" />
+                                        </StackPanel>
                                     </Grid>
                                     <Grid Margin="0,0,0,16">
                                         <Grid.ColumnDefinitions>
@@ -692,7 +704,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Dns}">
                                 <StackPanel>
                                     <TextBlock Text="DNS" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
                                     <TextBlock Text="配置自定义 DNS、FakeDNS 和国内外分流。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,18" />
@@ -724,7 +736,7 @@
                                 </StackPanel>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Margin="0,0,0,18">
+                            <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Advanced}">
                                 <Grid>
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="110" />
@@ -753,22 +765,35 @@
                                 </Grid>
                             </Border>
 
-                            <Border Style="{StaticResource Card}" Padding="24,16">
-                                <Grid Height="44">
-                                    <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="132" />
-                                        <ColumnDefinition Width="132" />
-                                    </Grid.ColumnDefinitions>
-                                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                                        <TextBlock Text="更新" FontSize="20" FontWeight="Bold" Margin="0,0,18,0" />
-                                        <TextBlock Text="核心：" FontSize="18" FontWeight="SemiBold" />
-                                        <TextBlock Text="Xray" FontSize="18" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="14,0,0,0" />
-                                        <TextBlock Text="{Binding AppVersionText}" FontSize="16" Foreground="{StaticResource SubtleTextBrush}" Margin="18,1,0,0" />
-                                    </StackPanel>
-                                    <Button Grid.Column="1" Content="下载核心" Style="{StaticResource OutlineButton}" Width="120" Height="40" HorizontalAlignment="Right" Click="DownloadXray_Click" />
-                                    <Button Grid.Column="2" Content="检查更新" Style="{StaticResource OutlineButton}" Width="120" Height="40" HorizontalAlignment="Right" Click="CheckUpdate_Click" />
-                                </Grid>
+                            <Border Style="{StaticResource Card}" Padding="24,20" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Update}">
+                                <StackPanel>
+                                    <TextBlock Text="更新" FontSize="21" FontWeight="Bold" Margin="0,0,0,6" />
+                                    <TextBlock Text="管理 MyRay Lite 更新、Xray Core 版本和 geoip/geosite 数据。" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,18" />
+                                    <Grid Margin="0,0,0,14">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="150" />
+                                            <ColumnDefinition Width="*" />
+                                        </Grid.ColumnDefinitions>
+                                        <Grid.RowDefinitions>
+                                            <RowDefinition Height="36" />
+                                            <RowDefinition Height="36" />
+                                            <RowDefinition Height="36" />
+                                        </Grid.RowDefinitions>
+                                        <TextBlock Text="应用版本" FontSize="16" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Column="1" Text="{Binding AppVersionText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="1" Text="当前核心" FontSize="16" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="1" Grid.Column="1" Text="{Binding XrayCoreVersionText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource BlueBrush}" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                        <TextBlock Grid.Row="2" Text="geo 数据" FontSize="16" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                        <TextBlock Grid.Row="2" Grid.Column="1" Text="{Binding GeoDataStatusText}" FontSize="16" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" VerticalAlignment="Center" />
+                                    </Grid>
+                                    <TextBlock Text="{Binding XrayLatestVersionText, StringFormat=最新核心：{0}}" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,0,0,14" />
+                                    <UniformGrid Columns="4" Rows="1">
+                                        <Button Content="检查应用" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,6,0" Click="CheckUpdate_Click" />
+                                        <Button Content="检查核心" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="CheckXrayCore_Click" />
+                                        <Button Content="更新核心" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="UpdateXrayCore_Click" />
+                                        <Button Content="更新 geo" Style="{StaticResource PrimaryButton}" Height="42" Margin="6,0,0,0" Click="UpdateGeoData_Click" />
+                                    </UniformGrid>
+                                </StackPanel>
                             </Border>
                         </StackPanel>
                             </ScrollViewer>
@@ -787,27 +812,49 @@
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Text="显示应用日志、Xray 启动日志和测速诊断。Xray 启动失败时优先看这里。"
                                            Foreground="{StaticResource SubtleTextBrush}"
                                            FontSize="16"
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,12" />
-                                <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                    <Grid.ColumnDefinitions>
+                                        <ColumnDefinition Width="*" />
+                                        <ColumnDefinition Width="126" />
+                                        <ColumnDefinition Width="124" />
+                                    </Grid.ColumnDefinitions>
+                                    <Grid>
+                                        <TextBox x:Name="LogSearchTextBox" Height="44" FontSize="15" Padding="46,0,12,0" TextChanged="LogSearchTextBox_TextChanged" />
+                                        <TextBlock Style="{StaticResource IconText}" Text="&#xE721;" Foreground="#718096" HorizontalAlignment="Left" Width="38" Margin="8,0,0,0" FontSize="18" />
+                                        <TextBlock Text="搜索日志" IsHitTestVisible="False" Margin="46,0,0,0" VerticalAlignment="Center" Foreground="#9AA6B2" FontSize="15" Visibility="{Binding IsLogSearchEmpty, Converter={StaticResource BoolVisibilityConverter}}" />
+                                    </Grid>
+                                    <ComboBox x:Name="LogLevelComboBox" Grid.Column="1" Height="44" Margin="10,0,0,0" FontSize="15" SelectedIndex="0" SelectionChanged="LogLevelComboBox_SelectionChanged">
+                                        <ComboBoxItem Content="全部" />
+                                        <ComboBoxItem Content="ERROR" />
+                                        <ComboBoxItem Content="WARN" />
+                                        <ComboBoxItem Content="INFO" />
+                                        <ComboBoxItem Content="XRAY" />
+                                    </ComboBox>
+                                    <CheckBox x:Name="LogAutoScrollCheckBox" Grid.Column="2" Content="自动滚动" IsChecked="True" FontSize="15" Margin="12,0,0,0" Click="LogAutoScroll_Click" />
+                                </Grid>
+                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RefreshLogs_Click" Content="刷新" />
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RunDiagnostics_Click" Content="诊断" />
                                     <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CreateDiagnosticPackage_Click" Content="诊断包" />
+                                    <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CopyLogs_Click" Content="复制" />
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="ClearLogs_Click" Content="清空" />
                                     <Button Style="{StaticResource PrimaryButton}" Width="120" Height="44" Padding="0" HorizontalContentAlignment="Center" Click="OpenLogFolder_Click" Content="打开目录" />
                                 </StackPanel>
                             </Grid>
                             <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="430">
                                 <Grid>
-                                    <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="18">
+                                    <ScrollViewer x:Name="LogsScrollViewer" VerticalScrollBarVisibility="Auto" Padding="18">
                                         <ItemsControl ItemsSource="{Binding LogLines}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding}" FontFamily="Consolas" FontSize="13" Foreground="{StaticResource LogTextBrush}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                    <TextBlock Text="{Binding Text}" FontFamily="Consolas" FontSize="13" Foreground="{Binding Foreground}" TextWrapping="Wrap" Margin="0,0,0,4" />
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
@@ -844,7 +891,12 @@
                         <ScrollViewer Grid.Row="1" Margin="0,18,0,0" VerticalScrollBarVisibility="Auto">
                             <StackPanel>
                                 <TextBlock Text="{Binding SelectedNodeDetail.Name}" FontSize="22" FontWeight="Bold" Foreground="{StaticResource TextBrush}" TextWrapping="Wrap" />
-                                <TextBlock Text="{Binding SelectedNodeDetail.DisplayFailureReason}" FontSize="14" Foreground="#F97316" TextWrapping="Wrap" Margin="0,8,0,18" />
+                                <TextBlock Text="{Binding SelectedNodeDetail.DisplayFailureReason}" FontSize="14" Foreground="#F97316" TextWrapping="Wrap" Margin="0,8,0,12" />
+                                <UniformGrid Columns="3" Rows="1" Margin="0,0,0,16">
+                                    <Button Content="连接" Style="{StaticResource PrimaryButton}" Height="40" Margin="0,0,6,0" Padding="0" FontSize="15" Click="ConnectSelectedNode_Click" />
+                                    <Button Content="测速" Style="{StaticResource OutlineButton}" Height="40" Margin="3,0" Padding="0" FontSize="15" Click="TestSelectedNode_Click" />
+                                    <Button Content="复制名称" Style="{StaticResource OutlineButton}" Height="40" Margin="6,0,0,0" Padding="0" FontSize="15" Click="CopyNodeName_Click" />
+                                </UniformGrid>
 
                                 <Grid>
                                     <Grid.ColumnDefinitions>
@@ -861,6 +913,9 @@
                                         <RowDefinition Height="50" />
                                         <RowDefinition Height="50" />
                                         <RowDefinition Height="50" />
+                                        <RowDefinition Height="38" />
+                                        <RowDefinition Height="38" />
+                                        <RowDefinition Height="38" />
                                         <RowDefinition Height="38" />
                                         <RowDefinition Height="38" />
                                         <RowDefinition Height="38" />
@@ -889,6 +944,12 @@
                                     <TextBlock Grid.Row="10" Grid.Column="1" Text="{Binding SelectedNodeDetail.DisplayTestType}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                                     <TextBlock Grid.Row="11" Text="状态" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
                                     <TextBlock Grid.Row="11" Grid.Column="1" Text="{Binding SelectedNodeDetail.Status}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="12" Text="端点" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="12" Grid.Column="1" Text="{Binding SelectedNodeEndpointText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Row="13" Text="来源" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="13" Grid.Column="1" Text="{Binding SelectedNodeSubscriptionText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" TextTrimming="CharacterEllipsis" />
+                                    <TextBlock Grid.Row="14" Text="最近测速" Foreground="{StaticResource SubtleTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Grid.Row="14" Grid.Column="1" Text="{Binding SelectedNodeLastTestText}" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" VerticalAlignment="Center" />
                                 </Grid>
 
                                 <Button Content="保存修改" Style="{StaticResource PrimaryButton}" Height="44" Margin="0,20,0,0" Click="SaveNodeDetails_Click" />

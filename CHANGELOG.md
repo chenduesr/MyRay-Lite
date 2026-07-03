@@ -1,5 +1,16 @@
 # Changelog
 
+## v1.8.0
+
+### Feature Upgrade
+
+- Added a Home connection flow card for disconnected, connecting, and connected states.
+- Added Home runtime, current upload/download speed, today traffic estimate, and installed Xray Core version display.
+- Added Xray Core management in Settings: installed version, latest version check, one-click core update, and geoip/geosite data update.
+- Added node detail shortcuts for connect, retest, copy node name, plus endpoint, subscription source, and latest test time.
+- Added Settings secondary navigation for Basic, Proxy, Routing, DNS, Advanced, and Update sections.
+- Added routing rule validation before applying custom direct/proxy/block rules.
+- Added log search, level filter, auto-scroll toggle, copy visible logs, and severity-colored log lines.
 ## v1.7.0
 
 ### UI Polish
