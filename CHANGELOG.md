@@ -2,15 +2,15 @@
 
 ## v1.8.0
 
-### Feature Upgrade
+### 功能升级
 
-- Added a Home connection flow card for disconnected, connecting, and connected states.
-- Added Home runtime, current upload/download speed, today traffic estimate, and installed Xray Core version display.
-- Added Xray Core management in Settings: installed version, latest version check, one-click core update, and geoip/geosite data update.
-- Added node detail shortcuts for connect, retest, copy node name, plus endpoint, subscription source, and latest test time.
-- Added Settings secondary navigation for Basic, Proxy, Routing, DNS, Advanced, and Update sections.
-- Added routing rule validation before applying custom direct/proxy/block rules.
-- Added log search, level filter, auto-scroll toggle, copy visible logs, and severity-colored log lines.
+- 首页新增连接流程卡片，区分未连接、连接中和已连接状态。
+- 首页新增连接时长、实时上传/下载速度、今日流量估算和已安装 Xray Core 版本显示。
+- 设置页新增 Xray Core 管理：当前版本、最新版检查、一键更新核心、更新 geoip/geosite 数据。
+- 节点详情新增连接、重新测速、复制节点名称等快捷操作，并展示端点、订阅来源和最近测速时间。
+- 设置页新增二级导航：基础、代理、路由、DNS、高级、更新。
+- 自定义路由规则新增保存前格式校验，减少规则写错导致连接异常。
+- 日志页新增搜索、等级筛选、自动滚动开关、复制可见日志和错误/警告高亮。
 ## v1.7.0
 
 ### UI Polish
