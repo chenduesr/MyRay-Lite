@@ -133,6 +133,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _currentPage = value;
             Notify();
             NotifyNavigation();
+            BeginPageAnimation();
             if (string.Equals(value, "Logs", StringComparison.OrdinalIgnoreCase))
             {
                 RefreshLogLines();
@@ -183,6 +184,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     public bool HasNodes => FilteredNodes.Count > 0;
     public string NodeFilterSummary => _nodeFilter == "全部" ? $"共 {NodeCount} 个节点" : $"{_nodeFilter} · {FilteredNodes.Count} 个";
     public bool HasLogs => LogLines.Count > 0;
+    public string LogLineCountText => LogLines.Count == 0 ? "暂无日志" : $"{LogLines.Count} 行日志";
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
     public bool IsLogSearchEmpty => string.IsNullOrWhiteSpace(_logSearchText);
 
@@ -204,6 +206,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (_settingsSection == value) return;
             _settingsSection = value;
             Notify();
+            BeginSettingsSectionAnimation();
         }
     }
     public string AppVersionText => $"v{GetCurrentVersionText()}";
@@ -244,6 +247,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Notify();
             Notify(nameof(HasToast));
             ScheduleToastAutoClose(value);
+            if (!string.IsNullOrWhiteSpace(value))
+            {
+                BeginToastAnimation();
+            }
         }
     }
 
@@ -296,6 +303,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             Notify(nameof(SelectedNodeTransportText));
             Notify(nameof(SelectedNodeSubscriptionText));
             Notify(nameof(SelectedNodeLastTestText));
+            if (value is not null)
+            {
+                BeginNodeDetailAnimation();
+            }
         }
     }
 
@@ -1130,6 +1141,24 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         SetToast("日志已复制", $"已复制 {LogLines.Count} 行");
     }
 
+    private void CopyErrorLogs_Click(object sender, RoutedEventArgs e)
+    {
+        var errorLines = LogLines
+            .Where(line => string.Equals(line.Level, "ERROR", StringComparison.OrdinalIgnoreCase) ||
+                           string.Equals(line.Level, "WARN", StringComparison.OrdinalIgnoreCase))
+            .Select(line => line.Text)
+            .ToList();
+
+        if (errorLines.Count == 0)
+        {
+            SetToast("没有错误日志", "当前筛选结果里没有 ERROR/WARN");
+            return;
+        }
+
+        WpfClipboard.SetText(string.Join(Environment.NewLine, errorLines));
+        SetToast("错误日志已复制", $"已复制 {errorLines.Count} 行");
+    }
+
     private void SettingsSection_Click(object sender, RoutedEventArgs e)
     {
         if (sender is WpfButton { Tag: string section })
@@ -1621,30 +1650,61 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     }
 
     public sealed class LogLineItem
-{
-    public string Text { get; init; } = string.Empty;
-    public string Level { get; init; } = "INFO";
-    public MediaBrush Foreground => Level switch
     {
-        "ERROR" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#EF4444")),
-        "WARN" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#F97316")),
-        "XRAY" => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#7C3AED")),
-        _ => new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString("#263445"))
-    };
+        public string Text { get; init; } = string.Empty;
+        public string Level { get; init; } = "INFO";
+        public MediaBrush Foreground => Level switch
+        {
+            "ERROR" => Solid("#EF4444"),
+            "WARN" => Solid("#F97316"),
+            "XRAY" => Solid("#7C3AED"),
+            _ => Solid("#263445")
+        };
 
-    public static LogLineItem From(string line)
-    {
-        var level = line.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("error", StringComparison.OrdinalIgnoreCase)
-            ? "ERROR"
-            : line.Contains("[WARN]", StringComparison.OrdinalIgnoreCase) || line.Contains("warning", StringComparison.OrdinalIgnoreCase)
-                ? "WARN"
-                : line.Contains("xray", StringComparison.OrdinalIgnoreCase) || line.StartsWith("=====") || !line.StartsWith("[")
-                    ? "XRAY"
-                    : "INFO";
+        public MediaBrush Background => Level switch
+        {
+            "ERROR" => Solid("#FFF5F5"),
+            "WARN" => Solid("#FFF7ED"),
+            "XRAY" => Solid("#F6F1FF"),
+            _ => Solid("#FFFFFF")
+        };
 
-        return new LogLineItem { Text = line, Level = level };
+        public MediaBrush BadgeBackground => Level switch
+        {
+            "ERROR" => Solid("#FEE2E2"),
+            "WARN" => Solid("#FFEDD5"),
+            "XRAY" => Solid("#EDE9FE"),
+            _ => Solid("#EAF3FF")
+        };
+
+        public MediaBrush BadgeForeground => Level switch
+        {
+            "ERROR" => Solid("#DC2626"),
+            "WARN" => Solid("#EA580C"),
+            "XRAY" => Solid("#6D28D9"),
+            _ => Solid("#0875F8")
+        };
+
+        public static LogLineItem From(string line)
+        {
+            var level = line.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("error", StringComparison.OrdinalIgnoreCase)
+                ? "ERROR"
+                : line.Contains("[WARN]", StringComparison.OrdinalIgnoreCase) || line.Contains("warning", StringComparison.OrdinalIgnoreCase)
+                    ? "WARN"
+                    : line.Contains("xray", StringComparison.OrdinalIgnoreCase) || line.StartsWith("=====") || !line.StartsWith("[")
+                        ? "XRAY"
+                        : "INFO";
+
+            return new LogLineItem { Text = line, Level = level };
+        }
+
+        private static MediaSolidColorBrush Solid(string color)
+        {
+            var brush = new MediaSolidColorBrush((MediaColor)MediaColorConverter.ConvertFromString(color));
+            brush.Freeze();
+            return brush;
+        }
     }
-}
 private sealed record PendingUpdateMarker(string PreviousVersion, string InstallerPath, DateTimeOffset StartedAt);
 
     public void ShowFromTray()
@@ -1827,6 +1887,7 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
 
         Notify(nameof(LogLines));
         Notify(nameof(HasLogs));
+        Notify(nameof(LogLineCountText));
         if (LogAutoScroll)
         {
             ScrollLogsToEnd();
@@ -1991,6 +2052,61 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
         }), System.Windows.Threading.DispatcherPriority.Loaded);
     }
 
+    private void BeginPageAnimation()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            PageHost.Opacity = 0;
+            PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
+        }), DispatcherPriority.Loaded);
+    }
+
+    private void BeginSettingsSectionAnimation()
+    {
+        if (!string.Equals(CurrentPage, "Settings", StringComparison.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        BeginPageAnimation();
+    }
+
+    private void BeginNodeDetailAnimation()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            NodeDetailPanel.Opacity = 0;
+            NodeDetailTransform.X = 22;
+            NodeDetailPanel.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(140))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
+            NodeDetailTransform.BeginAnimation(TranslateTransform.XProperty, new DoubleAnimation(22, 0, TimeSpan.FromMilliseconds(160))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
+        }), DispatcherPriority.Loaded);
+    }
+
+    private void BeginToastAnimation()
+    {
+        Dispatcher.BeginInvoke(new Action(() =>
+        {
+            ToastCard.Opacity = 0;
+            ToastTransform.Y = -8;
+            ToastCard.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(120))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
+            ToastTransform.BeginAnimation(TranslateTransform.YProperty, new DoubleAnimation(-8, 0, TimeSpan.FromMilliseconds(140))
+            {
+                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
+            });
+        }), DispatcherPriority.Loaded);
+    }
     private void SetToast(string title, string? detail = null)
     {
         ToastMessage = string.IsNullOrWhiteSpace(detail)

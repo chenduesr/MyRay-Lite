@@ -226,6 +226,41 @@
             <Setter Property="FontSize" Value="15" />
         </Style>
 
+        <Style x:Key="BadgeText" TargetType="TextBlock">
+            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="VerticalAlignment" Value="Center" />
+        </Style>
+
+        <Style x:Key="NodeListRow" TargetType="Border">
+            <Setter Property="CornerRadius" Value="9" />
+            <Setter Property="Background" Value="{StaticResource PanelBrush}" />
+            <Setter Property="MinHeight" Value="76" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F6FAFF" />
+                    <Setter Property="BorderBrush" Value="#D7E8FF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
+
+        <Style x:Key="LogListRow" TargetType="Border">
+            <Setter Property="CornerRadius" Value="7" />
+            <Setter Property="Padding" Value="10,7" />
+            <Setter Property="Margin" Value="0,0,0,4" />
+            <Setter Property="Background" Value="{Binding Background}" />
+            <Setter Property="BorderBrush" Value="Transparent" />
+            <Setter Property="BorderThickness" Value="1" />
+            <Style.Triggers>
+                <Trigger Property="IsMouseOver" Value="True">
+                    <Setter Property="Background" Value="#F8FBFF" />
+                    <Setter Property="BorderBrush" Value="#D7E8FF" />
+                </Trigger>
+            </Style.Triggers>
+        </Style>
         <Style TargetType="CheckBox">
             <Setter Property="Cursor" Value="Hand" />
             <Setter Property="Foreground" Value="{StaticResource TextBrush}" />
@@ -383,7 +418,7 @@
                     <Button Style="{StaticResource WindowButton}" Content="×" Click="Close_Click" FontSize="22" />
                 </StackPanel>
 
-                <Grid Grid.Row="1" Margin="44,0,36,36">
+                <Grid x:Name="PageHost" Grid.Row="1" Margin="44,0,36,36">
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Home}">
                         <Grid HorizontalAlignment="Center" Width="820" Margin="0,16,0,0">
                             <Grid.RowDefinitions>
@@ -515,8 +550,8 @@
                                             <ColumnDefinition Width="50" />
                                             <ColumnDefinition Width="*" />
                                             <ColumnDefinition Width="126" />
-                                            <ColumnDefinition Width="118" />
-                                            <ColumnDefinition Width="28" />
+                                            <ColumnDefinition Width="132" />
+                                            <ColumnDefinition Width="32" />
                                         </Grid.ColumnDefinitions>
                                         <Button Grid.Column="2" Content="节点名称" Tag="Name" Click="SortNodes_Click" Background="Transparent" BorderBrush="Transparent" Foreground="{StaticResource SubtleTextBrush}" HorizontalContentAlignment="Left" FontSize="14" FontWeight="SemiBold" />
                                         <Button Grid.Column="3" Content="延迟" Tag="Delay" Click="SortNodes_Click" Background="Transparent" BorderBrush="Transparent" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" FontWeight="SemiBold" />
@@ -526,15 +561,15 @@
                                         <ItemsControl ItemsSource="{Binding FilteredNodes}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate DataType="{x:Type core:ProxyNode}">
-                                                    <Border CornerRadius="8" Background="{StaticResource PanelBrush}" MinHeight="68" Margin="0,0,0,2">
+                                                    <Border Style="{StaticResource NodeListRow}">
                                                         <Grid>
                                                             <Grid.ColumnDefinitions>
                                                                 <ColumnDefinition Width="30" />
                                                                 <ColumnDefinition Width="50" />
                                                                 <ColumnDefinition Width="*" />
                                                                 <ColumnDefinition Width="126" />
-                                                                <ColumnDefinition Width="118" />
-                                                                <ColumnDefinition Width="28" />
+                                                                <ColumnDefinition Width="132" />
+                                                                <ColumnDefinition Width="32" />
                                                             </Grid.ColumnDefinitions>
                                                             <Ellipse Width="10" Height="10" Fill="{Binding Status, Converter={x:Static local:NodeStatusBrushConverter.Instance}}" VerticalAlignment="Center" HorizontalAlignment="Center" />
                                                             <Border Grid.Column="1" Width="38" Height="38" Background="#F0F5FB" CornerRadius="19" VerticalAlignment="Center" HorizontalAlignment="Center">
@@ -542,18 +577,30 @@
                                                             </Border>
                                                             <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" HorizontalContentAlignment="Left" Padding="4,0" Click="CopyNode_Click" Tag="{Binding Id}">
                                                                 <StackPanel>
-                                                                    <TextBlock Text="{Binding Name}" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <StackPanel Orientation="Horizontal">
+                                                                        <TextBlock Text="{Binding Name}" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                                                        <Border Visibility="{Binding IsActive, Converter={StaticResource BoolVisibilityConverter}}" Background="#E9FBEF" BorderBrush="#BDECCF" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="8,0,0,0" VerticalAlignment="Center">
+                                                                            <TextBlock Text="当前" Style="{StaticResource BadgeText}" Foreground="#15803D" />
+                                                                        </Border>
+                                                                    </StackPanel>
                                                                     <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
-                                                                        <Border Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="0,0,6,0"><TextBlock Text="{Binding Protocol}" FontSize="11" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" /></Border>
-                                                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2"><TextBlock Text="{Binding Network}" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" FontWeight="SemiBold" /></Border>
+                                                                        <Border Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="0,0,6,0"><TextBlock Text="{Binding Protocol}" Style="{StaticResource BadgeText}" Foreground="{StaticResource BlueBrush}" /></Border>
+                                                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2"><TextBlock Text="{Binding Network}" Style="{StaticResource BadgeText}" Foreground="{StaticResource SubtleTextBrush}" /></Border>
                                                                     </StackPanel>
                                                                 </StackPanel>
                                                             </Button>
                                                             <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="{Binding DisplayFailureReason}">
-                                                                <TextBlock Text="{Binding DisplayDelay}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                                                                <TextBlock Text="{Binding DisplayTestType}" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                                                <Border Background="{Binding Status, Converter={x:Static local:NodeStatusSoftBrushConverter.Instance}}" BorderBrush="#D8E2EF" BorderThickness="1" CornerRadius="12" Padding="10,3">
+                                                                    <TextBlock Text="{Binding DisplayDelay}" FontSize="16" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                                                </Border>
+                                                                <TextBlock Text="{Binding DisplayTestType}" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" HorizontalAlignment="Center" Margin="0,4,0,0" />
                                                             </StackPanel>
-                                                            <Button Grid.Column="4" Height="40" Width="100" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" IsEnabled="{Binding IsSupportedByXray}" ToolTip="{Binding DisplayFailureReason}" Style="{StaticResource OutlineButton}" FontSize="16" />
+                                                            <StackPanel Grid.Column="4" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="{Binding DisplayFailureReason}">
+                                                                <Border Background="{Binding Status, Converter={x:Static local:NodeStatusSoftBrushConverter.Instance}}" BorderBrush="#D8E2EF" BorderThickness="1" CornerRadius="12" Padding="10,3" Margin="0,0,0,5">
+                                                                    <TextBlock Text="{Binding Status, Converter={x:Static local:NodeStatusTextConverter.Instance}}" Style="{StaticResource BadgeText}" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" />
+                                                                </Border>
+                                                                <Button Height="32" Width="98" Click="ConnectNode_Click" Tag="{Binding Id}" Content="{Binding IsActive, Converter={x:Static local:NodeActionTextConverter.Instance}}" IsEnabled="{Binding IsSupportedByXray}" ToolTip="{Binding DisplayFailureReason}" Style="{StaticResource OutlineButton}" FontSize="14" Padding="0" />
+                                                            </StackPanel>
                                                             <Button Grid.Column="5" Background="Transparent" BorderBrush="Transparent" Click="ViewNodeDetails_Click" Tag="{Binding Id}" ToolTip="查看节点详情">
                                                                 <TextBlock Style="{StaticResource IconText}" Text="&#xE76C;" Foreground="#B7C2D0" FontSize="18" />
                                                             </Button>
@@ -878,30 +925,48 @@
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RunDiagnostics_Click" Content="诊断" />
                                     <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CreateDiagnosticPackage_Click" Content="诊断包" />
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CopyLogs_Click" Content="复制" />
+                                    <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CopyErrorLogs_Click" Content="复制错误" />
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="ClearLogs_Click" Content="清空" />
                                     <Button Style="{StaticResource PrimaryButton}" Width="120" Height="44" Padding="0" HorizontalContentAlignment="Center" Click="OpenLogFolder_Click" Content="打开目录" />
                                 </StackPanel>
                             </Grid>
                             <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="430">
                                 <Grid>
-                                    <ScrollViewer x:Name="LogsScrollViewer" VerticalScrollBarVisibility="Auto" Padding="18">
+                                    <TextBlock Text="{Binding LogLineCountText}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,18,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="13" FontWeight="SemiBold" Panel.ZIndex="2" />
+                                    <ScrollViewer x:Name="LogsScrollViewer" VerticalScrollBarVisibility="Auto" Padding="18,42,18,18">
                                         <ItemsControl ItemsSource="{Binding LogLines}">
                                             <ItemsControl.ItemTemplate>
                                                 <DataTemplate>
-                                                    <TextBlock Text="{Binding Text}" FontFamily="Consolas" FontSize="13" Foreground="{Binding Foreground}" TextWrapping="Wrap" Margin="0,0,0,4" />
+                                                    <Border Style="{StaticResource LogListRow}">
+                                                        <Grid>
+                                                            <Grid.ColumnDefinitions>
+                                                                <ColumnDefinition Width="58" />
+                                                                <ColumnDefinition Width="*" />
+                                                            </Grid.ColumnDefinitions>
+                                                            <Border Background="{Binding BadgeBackground}" CornerRadius="10" Padding="8,2" HorizontalAlignment="Left" VerticalAlignment="Top">
+                                                                <TextBlock Text="{Binding Level}" Style="{StaticResource BadgeText}" Foreground="{Binding BadgeForeground}" />
+                                                            </Border>
+                                                            <TextBlock Grid.Column="1" Text="{Binding Text}" FontFamily="Consolas" FontSize="13" Foreground="{Binding Foreground}" TextWrapping="Wrap" />
+                                                        </Grid>
+                                                    </Border>
                                                 </DataTemplate>
                                             </ItemsControl.ItemTemplate>
                                         </ItemsControl>
                                     </ScrollViewer>
-                                    <TextBlock Text="暂无日志" Visibility="{Binding HasLogs, Converter={StaticResource InverseBoolVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center" Foreground="#8B97A8" FontSize="18" />
+                                    <StackPanel Visibility="{Binding HasLogs, Converter={StaticResource InverseBoolVisibilityConverter}}" HorizontalAlignment="Center" VerticalAlignment="Center">
+                                        <TextBlock Style="{StaticResource IconText}" Text="&#xE9D9;" Foreground="#B8C4D2" FontSize="42" HorizontalAlignment="Center" Margin="0,0,0,12" />
+                                        <TextBlock Text="暂无匹配日志" Foreground="{StaticResource SubtleTextBrush}" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                                        <TextBlock Text="可以切换来源、等级或清空搜索条件。" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" HorizontalAlignment="Center" Margin="0,8,0,0" />
+                                    </StackPanel>
                                 </Grid>
                             </Border>
                         </Grid>
                     </Grid>
                 </Grid>
 
-                <Border Visibility="{Binding IsNodeDetailOpen, Converter={StaticResource BoolVisibilityConverter}}"
-                        Width="360"
+                <Border x:Name="NodeDetailPanel"
+                        Visibility="{Binding IsNodeDetailOpen, Converter={StaticResource BoolVisibilityConverter}}"
+                        Width="430"
                         HorizontalAlignment="Right"
                         VerticalAlignment="Stretch"
                         Margin="0,86,18,24"
@@ -910,6 +975,9 @@
                         BorderThickness="1"
                         CornerRadius="10"
                         Padding="22">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="NodeDetailTransform" />
+                    </Border.RenderTransform>
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="22" ShadowDepth="6" Opacity="0.16" Color="#64748B" />
                     </Border.Effect>
@@ -934,7 +1002,7 @@
 
                                 <Grid>
                                     <Grid.ColumnDefinitions>
-                                        <ColumnDefinition Width="92" />
+                                        <ColumnDefinition Width="108" />
                                         <ColumnDefinition Width="*" />
                                     </Grid.ColumnDefinitions>
                                     <Grid.RowDefinitions>
@@ -1027,7 +1095,8 @@
                     </Border>
                 </Grid>
 
-                <Border Grid.RowSpan="2"
+                <Border x:Name="ToastCard"
+                        Grid.RowSpan="2"
                         Panel.ZIndex="150"
                         Visibility="{Binding HasToast, Converter={StaticResource BoolVisibilityConverter}}"
                         Background="{StaticResource PanelBrush}"
@@ -1038,6 +1107,9 @@
                         HorizontalAlignment="Right"
                         VerticalAlignment="Top"
                         Margin="0,88,22,0">
+                    <Border.RenderTransform>
+                        <TranslateTransform x:Name="ToastTransform" />
+                    </Border.RenderTransform>
                     <Border.Effect>
                         <DropShadowEffect BlurRadius="12" ShadowDepth="3" Opacity="0.10" Color="#64748B" />
                     </Border.Effect>

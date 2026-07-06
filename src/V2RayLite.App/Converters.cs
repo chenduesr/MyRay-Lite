@@ -98,6 +98,54 @@ public sealed class NodeDelayBrushConverter : IValueConverter
     private static SolidColorBrush Solid(string color) => new((WpfColor)WpfColorConverter.ConvertFromString(color));
 }
 
+public sealed class NodeStatusTextConverter : IValueConverter
+{
+    public static NodeStatusTextConverter Instance { get; } = new();
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value switch
+        {
+            NodeStatus.Available => "可用",
+            NodeStatus.Testing => "测速中",
+            NodeStatus.Unavailable => "不可用",
+            _ => "未测速"
+        };
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotSupportedException();
+    }
+}
+
+public sealed class NodeStatusSoftBrushConverter : IValueConverter
+{
+    public static NodeStatusSoftBrushConverter Instance { get; } = new();
+
+    public object Convert(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        return value switch
+        {
+            NodeStatus.Available => Solid("#E9FBEF"),
+            NodeStatus.Testing => Solid("#EAF3FF"),
+            NodeStatus.Unavailable => Solid("#FFF4E8"),
+            _ => Solid("#F1F5F9")
+        };
+    }
+
+    public object ConvertBack(object value, Type targetType, object parameter, CultureInfo culture)
+    {
+        throw new NotSupportedException();
+    }
+
+    private static SolidColorBrush Solid(string color)
+    {
+        var brush = new SolidColorBrush((WpfColor)WpfColorConverter.ConvertFromString(color));
+        brush.Freeze();
+        return brush;
+    }
+}
 public sealed class FlagImageConverter : IValueConverter
 {
     public static FlagImageConverter Instance { get; } = new();
