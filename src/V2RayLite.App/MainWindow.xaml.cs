@@ -50,8 +50,10 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     private CancellationTokenSource? _settingsSaveCts;
     private string _subscriptionStatus = "未更新";
     private string _searchText = string.Empty;
+    private string _nodeFilter = "全部";
     private string _logSearchText = string.Empty;
     private string _logLevelFilter = "全部";
+    private string _logSourceFilter = "全部";
     private bool _logAutoScroll = true;
     private string _settingsSection = "Basic";
     private string _nodeSortKey = "Status";
@@ -179,6 +181,7 @@ public partial class MainWindow : Window, INotifyPropertyChanged
     };
     public int NodeCount => _nodes.Count;
     public bool HasNodes => FilteredNodes.Count > 0;
+    public string NodeFilterSummary => _nodeFilter == "全部" ? $"共 {NodeCount} 个节点" : $"{_nodeFilter} · {FilteredNodes.Count} 个";
     public bool HasLogs => LogLines.Count > 0;
     public bool IsSearchEmpty => string.IsNullOrWhiteSpace(_searchText);
     public bool IsLogSearchEmpty => string.IsNullOrWhiteSpace(_logSearchText);
@@ -827,6 +830,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
     }
 
+    private void NodeFilter_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: string filter })
+        {
+            _nodeFilter = filter;
+            RefreshFilteredNodes();
+            SetToast("节点筛选", NodeFilterSummary);
+        }
+    }
     private void CopyNode_Click(object sender, RoutedEventArgs e)
     {
         if (sender is WpfButton { Tag: string nodeId })
@@ -1070,6 +1082,15 @@ public partial class MainWindow : Window, INotifyPropertyChanged
         RefreshFilteredNodes();
     }
 
+    private void LogSource_Click(object sender, RoutedEventArgs e)
+    {
+        if (sender is WpfButton { Tag: string source })
+        {
+            _logSourceFilter = source;
+            RefreshLogLines();
+            SetToast("日志视图", source);
+        }
+    }
     private void LogSearchTextBox_TextChanged(object sender, TextChangedEventArgs e)
     {
         _logSearchText = LogSearchTextBox.Text.Trim();
@@ -1775,6 +1796,7 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
         Notify(nameof(FilteredNodes));
         Notify(nameof(HasNodes));
         Notify(nameof(NodeCount));
+        Notify(nameof(NodeFilterSummary));
         Notify(nameof(EmptyNodesTitle));
         Notify(nameof(EmptyNodesMessage));
     }
@@ -1818,6 +1840,16 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
             return false;
         }
 
+        if (_logSourceFilter == "应用" && (line.StartsWith("=====") || line.Contains("xray", StringComparison.OrdinalIgnoreCase) && !line.StartsWith("[")))
+        {
+            return false;
+        }
+
+        if (_logSourceFilter == "Xray" && line.StartsWith("[") && !line.Contains("xray", StringComparison.OrdinalIgnoreCase))
+        {
+            return false;
+        }
+
         return _logLevelFilter switch
         {
             "ERROR" => line.Contains("[ERROR]", StringComparison.OrdinalIgnoreCase) || line.Contains("error", StringComparison.OrdinalIgnoreCase),
@@ -1827,19 +1859,34 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
             _ => true
         };
     }
-
     private void ScrollLogsToEnd()
     {
         Dispatcher.BeginInvoke(new Action(() => LogsScrollViewer?.ScrollToEnd()), DispatcherPriority.Background);
     }
     private bool MatchesSearch(ProxyNode node)
     {
+        if (!MatchesNodeFilter(node))
+        {
+            return false;
+        }
+
         return string.IsNullOrWhiteSpace(_searchText)
             || node.Name.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
             || node.Address.Contains(_searchText, StringComparison.OrdinalIgnoreCase)
             || node.Raw.Contains(_searchText, StringComparison.OrdinalIgnoreCase);
     }
 
+    private bool MatchesNodeFilter(ProxyNode node)
+    {
+        return _nodeFilter switch
+        {
+            "可用" => node.Status == NodeStatus.Available,
+            "不可用" => node.Status == NodeStatus.Unavailable || !node.IsSupportedByXray,
+            "低延迟" => node.Status == NodeStatus.Available && node.DelayMs is > 0 and <= 200,
+            "当前" => node.IsActive,
+            _ => true
+        };
+    }
     private void RefreshActiveFlags()
     {
         foreach (var node in _nodes)

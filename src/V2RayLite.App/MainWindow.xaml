@@ -385,63 +385,63 @@
 
                 <Grid Grid.Row="1" Margin="44,0,36,36">
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Home}">
-                        <Grid HorizontalAlignment="Center" Width="760">
+                        <Grid HorizontalAlignment="Center" Width="820" Margin="0,16,0,0">
                             <Grid.RowDefinitions>
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="系统代理" Style="{StaticResource PageTitleText}" TextAlignment="Center" Margin="0,38,0,22" />
-                            <StackPanel Grid.Row="1" Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,0,0,28">
-                                <TextBlock Text="当前状态：" FontSize="21" Foreground="{StaticResource TextBrush}" />
-                                <TextBlock Text="{Binding RuntimeStatus}" FontSize="21" FontWeight="Bold" Foreground="{Binding RuntimeStatusBrush}" Margin="18,0,0,0" />
-                            </StackPanel>
-                            <Button Grid.Row="2" Style="{StaticResource PrimaryButton}" Width="384" Height="68" HorizontalAlignment="Center" Click="ToggleProxy_Click">
-                                <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
-                                    <TextBlock Style="{StaticResource IconText}" Text="&#xE7E8;" Foreground="White" FontSize="32" />
-                                    <TextBlock Text="{Binding ToggleProxyText}" FontSize="26" FontWeight="Bold" Margin="20,0,0,0" VerticalAlignment="Center" />
-                                </StackPanel>
-                            </Button>
+                            <TextBlock Text="系统代理" Style="{StaticResource PageTitleText}" TextAlignment="Center" Margin="0,8,0,18" />
 
-                            <StackPanel Grid.Row="3" Margin="0,36,0,0">
-                                <Border Style="{StaticResource Card}" Width="720" HorizontalAlignment="Center" Padding="24,22">
-                                    <StackPanel>
-                                        <Grid Margin="0,0,0,18">
-                                            <Grid.ColumnDefinitions>
-                                                <ColumnDefinition Width="*" />
-                                                <ColumnDefinition Width="Auto" />
-                                            </Grid.ColumnDefinitions>
-                                            <StackPanel>
-                                                <TextBlock Text="{Binding HomeStatusTitle}" FontSize="22" FontWeight="Bold" Foreground="{Binding RuntimeStatusBrush}" />
-                                                <TextBlock Text="{Binding HomeStatusDetail}" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" Margin="0,6,0,0" TextWrapping="Wrap" />
-                                            </StackPanel>
-                                            <Border Grid.Column="1" Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="18" Padding="16,7" VerticalAlignment="Top">
-                                                <TextBlock Text="{Binding RuntimeStatus}" FontSize="15" FontWeight="SemiBold" Foreground="{Binding RuntimeStatusBrush}" />
-                                            </Border>
-                                        </Grid>
-                                        <UniformGrid Columns="2" Rows="3">
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,10"><StackPanel><TextBlock Text="当前节点" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeName}" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,10"><StackPanel><TextBlock Text="延迟" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeDelay}" FontSize="19" Foreground="#18AE4D" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,10"><StackPanel><TextBlock Text="代理模式" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ProxyModeText}" FontSize="19" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,10"><StackPanel><TextBlock Text="Xray 状态" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding XrayStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="0,0,10,0"><StackPanel><TextBlock Text="系统代理" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding SystemProxyStatusText}" FontSize="19" Foreground="{Binding RuntimeStatusBrush}" FontWeight="SemiBold" Margin="0,8,0,0" /></StackPanel></Border>
-                                            <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="18,14" Margin="10,0,0,0"><StackPanel><TextBlock Text="核心" FontSize="14" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding XrayCoreVersionText}" FontSize="15" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,8,0,0" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
-                                        </UniformGrid>
-                                    </StackPanel>
-                                </Border>
-                                <UniformGrid Columns="3" Rows="1" Width="720" HorizontalAlignment="Center" Margin="0,24,0,0">
-                                    <Button Style="{StaticResource OutlineButton}" Height="54" Margin="0,0,12,0" Click="SwitchNode_Click" Content="切换节点" />
-                                    <Button Style="{StaticResource OutlineButton}" Height="54" Margin="6,0" Click="UpdateSubscription_Click" Content="更新订阅" />
-                                    <Button Style="{StaticResource OutlineButton}" Height="54" Margin="12,0,0,0" Click="TestActiveNode_Click" Content="测试延迟" />
-                                </UniformGrid>
-                            </StackPanel>
+                            <Border Grid.Row="1" Style="{StaticResource Card}" Width="760" HorizontalAlignment="Center" Padding="30,26">
+                                <Grid>
+                                    <Grid.RowDefinitions>
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                        <RowDefinition Height="Auto" />
+                                    </Grid.RowDefinitions>
+                                    <Grid>
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*" />
+                                            <ColumnDefinition Width="Auto" />
+                                        </Grid.ColumnDefinitions>
+                                        <StackPanel>
+                                            <TextBlock Text="{Binding ConnectionFlowTitle}" FontSize="28" FontWeight="Bold" Foreground="{Binding RuntimeStatusBrush}" />
+                                            <TextBlock Text="{Binding ConnectionFlowDetail}" FontSize="15" Foreground="{StaticResource SubtleTextBrush}" Margin="0,8,0,0" TextWrapping="Wrap" />
+                                        </StackPanel>
+                                        <Border Grid.Column="1" Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="20" Padding="16,8" VerticalAlignment="Top">
+                                            <TextBlock Text="{Binding RuntimeStatus}" FontSize="15" FontWeight="SemiBold" Foreground="{Binding RuntimeStatusBrush}" />
+                                        </Border>
+                                    </Grid>
+
+                                    <Button Grid.Row="1" Style="{StaticResource PrimaryButton}" Width="360" Height="64" HorizontalAlignment="Center" Margin="0,26,0,24" Click="ToggleProxy_Click">
+                                        <StackPanel Orientation="Horizontal" HorizontalAlignment="Center">
+                                            <TextBlock Style="{StaticResource IconText}" Text="&#xE7E8;" Foreground="White" FontSize="30" />
+                                            <TextBlock Text="{Binding ToggleProxyText}" FontSize="25" FontWeight="Bold" Margin="18,0,0,0" VerticalAlignment="Center" />
+                                        </StackPanel>
+                                    </Button>
+
+                                    <UniformGrid Grid.Row="2" Columns="5" Rows="1">
+                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="0,0,8,0"><StackPanel><TextBlock Text="当前节点" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeName}" FontSize="16" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,6,0,0" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
+                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="4,0"><StackPanel><TextBlock Text="延迟" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ActiveNodeDelay}" FontSize="16" Foreground="#18AE4D" FontWeight="SemiBold" Margin="0,6,0,0" /></StackPanel></Border>
+                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="4,0"><StackPanel><TextBlock Text="运行时长" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding ConnectionDurationText}" FontSize="16" Foreground="{StaticResource TextBrush}" FontWeight="SemiBold" Margin="0,6,0,0" /></StackPanel></Border>
+                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="4,0"><StackPanel><TextBlock Text="实时速率" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding CurrentDownloadSpeedText}" FontSize="15" Foreground="#18AE4D" FontWeight="SemiBold" Margin="0,6,0,0" /><TextBlock Text="{Binding CurrentUploadSpeedText}" FontSize="12" Foreground="{StaticResource SubtleTextBrush}" /></StackPanel></Border>
+                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="14,12" Margin="8,0,0,0"><StackPanel><TextBlock Text="今日流量" FontSize="13" Foreground="{StaticResource SubtleTextBrush}" /><TextBlock Text="{Binding TodayTrafficText}" FontSize="16" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" Margin="0,6,0,0" /><TextBlock Text="{Binding TrafficHintText}" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" TextTrimming="CharacterEllipsis" /></StackPanel></Border>
+                                    </UniformGrid>
+                                </Grid>
+                            </Border>
+
+                            <UniformGrid Grid.Row="2" Columns="3" Rows="1" Width="760" HorizontalAlignment="Center" Margin="0,22,0,0">
+                                <Button Style="{StaticResource OutlineButton}" Height="50" Margin="0,0,12,0" Click="SwitchNode_Click" Content="切换节点" />
+                                <Button Style="{StaticResource OutlineButton}" Height="50" Margin="6,0" Click="UpdateSubscription_Click" Content="更新订阅" />
+                                <Button Style="{StaticResource OutlineButton}" Height="50" Margin="12,0,0,0" Click="TestActiveNode_Click" Content="测试延迟" />
+                            </UniformGrid>
                         </Grid>
                     </Grid>
-
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Nodes}">
                         <Grid Width="880" HorizontalAlignment="Center" Margin="0,28,0,0">
                             <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
@@ -465,7 +465,22 @@
                                 <Button Grid.Column="2" Style="{StaticResource PrimaryButton}" Height="54" Margin="18,0,0,0" Click="TestAllNodes_Click" Content="测速" />
                             </Grid>
 
-                            <Border Grid.Row="2"
+                            <Grid Grid.Row="2" Margin="0,0,0,14">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="*" />
+                                    <ColumnDefinition Width="Auto" />
+                                </Grid.ColumnDefinitions>
+                                <StackPanel Orientation="Horizontal">
+                                    <Button Content="全部" Tag="全部" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
+                                    <Button Content="可用" Tag="可用" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
+                                    <Button Content="低延迟" Tag="低延迟" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
+                                    <Button Content="不可用" Tag="不可用" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
+                                    <Button Content="当前" Tag="当前" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Click="NodeFilter_Click" />
+                                </StackPanel>
+                                <TextBlock Grid.Column="1" Text="{Binding NodeFilterSummary}" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
+                            </Grid>
+
+                            <Border Grid.Row="3"
                                     Visibility="{Binding HasTestProgress, Converter={StaticResource BoolVisibilityConverter}}"
                                     Background="{StaticResource PanelBrush}"
                                     BorderBrush="{StaticResource LineBrush}"
@@ -488,7 +503,7 @@
                                 </Grid>
                             </Border>
 
-                            <Border Grid.Row="3" Style="{StaticResource Card}" Padding="12" MinHeight="390">
+                            <Border Grid.Row="4" Style="{StaticResource Card}" Padding="12" MinHeight="390">
                                 <Grid>
                                     <Grid.RowDefinitions>
                                         <RowDefinition Height="34" />
@@ -526,7 +541,13 @@
                                                                 <Image Source="{Binding Name, Converter={x:Static local:FlagImageConverter.Instance}}" Width="30" Height="30" Stretch="Uniform" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                                             </Border>
                                                             <Button Grid.Column="2" Background="Transparent" BorderBrush="Transparent" HorizontalContentAlignment="Left" Padding="4,0" Click="CopyNode_Click" Tag="{Binding Id}">
-                                                                <TextBlock Text="{Binding Name}" FontSize="20" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                                                <StackPanel>
+                                                                    <TextBlock Text="{Binding Name}" FontSize="19" FontWeight="SemiBold" Foreground="{StaticResource TextBrush}" TextTrimming="CharacterEllipsis" />
+                                                                    <StackPanel Orientation="Horizontal" Margin="0,5,0,0">
+                                                                        <Border Background="#EEF6FF" BorderBrush="#CFE4FF" BorderThickness="1" CornerRadius="10" Padding="8,2" Margin="0,0,6,0"><TextBlock Text="{Binding Protocol}" FontSize="11" Foreground="{StaticResource BlueBrush}" FontWeight="SemiBold" /></Border>
+                                                                        <Border Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="8,2"><TextBlock Text="{Binding Network}" FontSize="11" Foreground="{StaticResource SubtleTextBrush}" FontWeight="SemiBold" /></Border>
+                                                                    </StackPanel>
+                                                                </StackPanel>
                                                             </Button>
                                                             <StackPanel Grid.Column="3" VerticalAlignment="Center" HorizontalAlignment="Center" ToolTip="{Binding DisplayFailureReason}">
                                                                 <TextBlock Text="{Binding DisplayDelay}" FontSize="18" Foreground="{Binding Status, Converter={x:Static local:NodeDelayBrushConverter.Instance}}" FontWeight="SemiBold" HorizontalAlignment="Center" />
@@ -608,22 +629,28 @@
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Settings}">
-                        <Grid Width="860" HorizontalAlignment="Center" Margin="0,10,0,0">
+                        <Grid Width="900" HorizontalAlignment="Center" Margin="0,10,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="78" />
-                                <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
                             <TextBlock Text="设置" Style="{StaticResource PageTitleText}" Margin="0,0,0,12" />
-                            <UniformGrid Grid.Row="1" Columns="6" Rows="1" Margin="0,0,0,16">
-                                <Button Content="基础" Tag="Basic" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,6,0" Click="SettingsSection_Click" />
-                                <Button Content="代理" Tag="Proxy" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
-                                <Button Content="路由" Tag="Routing" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
-                                <Button Content="DNS" Tag="Dns" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
-                                <Button Content="高级" Tag="Advanced" Style="{StaticResource OutlineButton}" Height="42" Margin="3,0" Click="SettingsSection_Click" />
-                                <Button Content="更新" Tag="Update" Style="{StaticResource OutlineButton}" Height="42" Margin="6,0,0,0" Click="SettingsSection_Click" />
-                            </UniformGrid>
-                            <ScrollViewer Grid.Row="2" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
+                            <Grid Grid.Row="1">
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="*" />
+                                </Grid.ColumnDefinitions>
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,18,18">
+                                    <StackPanel>
+                                        <Button Content="基础" Tag="Basic" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="代理" Tag="Proxy" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="路由" Tag="Routing" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="DNS" Tag="Dns" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="高级" Tag="Advanced" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="更新" Tag="Update" Style="{StaticResource OutlineButton}" Height="42" Click="SettingsSection_Click" />
+                                    </StackPanel>
+                                </Border>
+                                <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
                         <StackPanel Margin="0,0,0,32">
                             <Border Style="{StaticResource Card}" Margin="0,0,0,18" Visibility="{Binding SettingsSection, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Proxy}">
                                 <StackPanel>
@@ -797,6 +824,7 @@
                             </Border>
                         </StackPanel>
                             </ScrollViewer>
+                            </Grid>
                         </Grid>
                     </Grid>
 
@@ -813,13 +841,19 @@
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
+                                    <RowDefinition Height="Auto" />
                                 </Grid.RowDefinitions>
                                 <TextBlock Text="显示应用日志、Xray 启动日志和测速诊断。Xray 启动失败时优先看这里。"
                                            Foreground="{StaticResource SubtleTextBrush}"
                                            FontSize="16"
                                            TextWrapping="Wrap"
                                            Margin="0,0,0,12" />
-                                <Grid Grid.Row="1" Margin="0,0,0,12">
+                                <StackPanel Grid.Row="1" Orientation="Horizontal" Margin="0,0,0,12">
+                                    <Button Content="全部日志" Tag="全部" Style="{StaticResource OutlineButton}" Height="36" Width="96" Padding="0" FontSize="14" Margin="0,0,8,0" Click="LogSource_Click" />
+                                    <Button Content="应用日志" Tag="应用" Style="{StaticResource OutlineButton}" Height="36" Width="96" Padding="0" FontSize="14" Margin="0,0,8,0" Click="LogSource_Click" />
+                                    <Button Content="Xray 日志" Tag="Xray" Style="{StaticResource OutlineButton}" Height="36" Width="96" Padding="0" FontSize="14" Click="LogSource_Click" />
+                                </StackPanel>
+                                <Grid Grid.Row="2" Margin="0,0,0,12">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
                                         <ColumnDefinition Width="126" />
@@ -839,7 +873,7 @@
                                     </ComboBox>
                                     <CheckBox x:Name="LogAutoScrollCheckBox" Grid.Column="2" Content="自动滚动" IsChecked="True" FontSize="15" Margin="12,0,0,0" Click="LogAutoScroll_Click" />
                                 </Grid>
-                                <StackPanel Grid.Row="2" Orientation="Horizontal" HorizontalAlignment="Right">
+                                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RefreshLogs_Click" Content="刷新" />
                                     <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RunDiagnostics_Click" Content="诊断" />
                                     <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CreateDiagnosticPackage_Click" Content="诊断包" />
