@@ -53,6 +53,7 @@
 
         <Style x:Key="WindowButton" TargetType="Button">
             <Setter Property="Width" Value="44" />
+            <Setter Property="Focusable" Value="False" />
             <Setter Property="Height" Value="36" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
@@ -80,9 +81,12 @@
 
         <Style x:Key="NavButton" TargetType="Button">
             <Setter Property="Height" Value="58" />
-            <Setter Property="Margin" Value="18,4" />
-            <Setter Property="Padding" Value="16,0" />
-            <Setter Property="HorizontalContentAlignment" Value="Stretch" />
+            <Setter Property="Width" Value="184" />
+            <Setter Property="Margin" Value="0,4" />
+            <Setter Property="Padding" Value="0" />
+            <Setter Property="HorizontalAlignment" Value="Center" />
+            <Setter Property="HorizontalContentAlignment" Value="Center" />
+            <Setter Property="Focusable" Value="False" />
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="BorderBrush" Value="Transparent" />
             <Setter Property="Foreground" Value="{StaticResource SidebarTextBrush}" />
@@ -91,7 +95,7 @@
                 <Setter.Value>
                     <ControlTemplate TargetType="Button">
                         <Border x:Name="Root" Background="{TemplateBinding Background}" CornerRadius="8">
-                            <ContentPresenter VerticalAlignment="Center" />
+                            <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
                         </Border>
                         <ControlTemplate.Triggers>
                             <Trigger Property="IsMouseOver" Value="True">
@@ -105,6 +109,7 @@
 
         <Style x:Key="PrimaryButton" TargetType="Button">
             <Setter Property="Height" Value="54" />
+            <Setter Property="Focusable" Value="False" />
             <Setter Property="MinWidth" Value="132" />
             <Setter Property="Padding" Value="22,0" />
             <Setter Property="Background" Value="{StaticResource BlueBrush}" />
@@ -152,6 +157,7 @@
 
         <Style x:Key="GhostButton" TargetType="Button">
             <Setter Property="Height" Value="48" />
+            <Setter Property="Focusable" Value="False" />
             <Setter Property="Background" Value="{StaticResource PanelBrush}" />
             <Setter Property="BorderBrush" Value="#D5DFEC" />
             <Setter Property="Foreground" Value="{StaticResource BlueBrush}" />
@@ -506,11 +512,11 @@
                                     <ColumnDefinition Width="Auto" />
                                 </Grid.ColumnDefinitions>
                                 <StackPanel Orientation="Horizontal">
-                                    <Button Content="全部" Tag="全部" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
-                                    <Button Content="可用" Tag="可用" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
-                                    <Button Content="低延迟" Tag="低延迟" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
-                                    <Button Content="不可用" Tag="不可用" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" />
-                                    <Button Content="当前" Tag="当前" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Click="NodeFilter_Click" />
+                                    <Button Content="全部" Tag="全部" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" Focusable="False" />
+                                    <Button Content="可用" Tag="可用" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" Focusable="False" />
+                                    <Button Content="低延迟" Tag="低延迟" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" Focusable="False" />
+                                    <Button Content="不可用" Tag="不可用" Style="{StaticResource OutlineButton}" Height="36" Width="88" Padding="0" FontSize="14" Margin="0,0,8,0" Click="NodeFilter_Click" Focusable="False" />
+                                    <Button Content="当前" Tag="当前" Style="{StaticResource OutlineButton}" Height="36" Width="76" Padding="0" FontSize="14" Click="NodeFilter_Click" Focusable="False" />
                                 </StackPanel>
                                 <TextBlock Grid.Column="1" Text="{Binding NodeFilterSummary}" Foreground="{StaticResource SubtleTextBrush}" FontSize="14" FontWeight="SemiBold" VerticalAlignment="Center" />
                             </Grid>
@@ -676,7 +682,7 @@
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Settings}">
-                        <Grid Width="900" HorizontalAlignment="Center" Margin="0,10,0,0">
+                        <Grid Width="880" HorizontalAlignment="Center" Margin="0,10,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="78" />
                                 <RowDefinition Height="*" />
@@ -684,17 +690,17 @@
                             <TextBlock Text="设置" Style="{StaticResource PageTitleText}" Margin="0,0,0,12" />
                             <Grid Grid.Row="1">
                                 <Grid.ColumnDefinitions>
-                                    <ColumnDefinition Width="150" />
+                                    <ColumnDefinition Width="172" />
                                     <ColumnDefinition Width="*" />
                                 </Grid.ColumnDefinitions>
-                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,18,18">
+                                <Border Background="{StaticResource PanelBrush}" BorderBrush="{StaticResource LineBrush}" BorderThickness="1" CornerRadius="10" Padding="10" Margin="0,0,16,18">
                                     <StackPanel>
-                                        <Button Content="基础" Tag="Basic" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
-                                        <Button Content="代理" Tag="Proxy" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
-                                        <Button Content="路由" Tag="Routing" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
-                                        <Button Content="DNS" Tag="Dns" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
-                                        <Button Content="高级" Tag="Advanced" Style="{StaticResource OutlineButton}" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
-                                        <Button Content="更新" Tag="Update" Style="{StaticResource OutlineButton}" Height="42" Click="SettingsSection_Click" />
+                                        <Button Content="基础" Tag="Basic" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="代理" Tag="Proxy" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="路由" Tag="Routing" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="DNS" Tag="Dns" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="高级" Tag="Advanced" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Margin="0,0,0,8" Click="SettingsSection_Click" />
+                                        <Button Content="更新" Tag="Update" Style="{StaticResource OutlineButton}" MinWidth="0" Height="42" Click="SettingsSection_Click" />
                                     </StackPanel>
                                 </Border>
                                 <ScrollViewer Grid.Column="1" VerticalScrollBarVisibility="Auto" HorizontalScrollBarVisibility="Disabled">
@@ -876,14 +882,14 @@
                     </Grid>
 
                     <Grid Visibility="{Binding CurrentPage, Converter={StaticResource PageVisibilityConverter}, ConverterParameter=Logs}">
-                        <Grid Width="880" HorizontalAlignment="Center" Margin="0,32,0,0">
+                        <Grid Width="860" HorizontalAlignment="Center" Margin="0,22,0,0">
                             <Grid.RowDefinitions>
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="Auto" />
                                 <RowDefinition Height="*" />
                             </Grid.RowDefinitions>
-                            <TextBlock Text="日志诊断" Style="{StaticResource PageTitleText}" Margin="0,10,0,20" />
-                            <Grid Grid.Row="1" Margin="0,0,0,18">
+                            <TextBlock Text="日志诊断" Style="{StaticResource PageTitleText}" Margin="0,4,0,14" />
+                            <Grid Grid.Row="1" Margin="0,0,0,12">
                                 <Grid.RowDefinitions>
                                     <RowDefinition Height="Auto" />
                                     <RowDefinition Height="Auto" />
@@ -900,37 +906,37 @@
                                     <Button Content="应用日志" Tag="应用" Style="{StaticResource OutlineButton}" Height="36" Width="96" Padding="0" FontSize="14" Margin="0,0,8,0" Click="LogSource_Click" />
                                     <Button Content="Xray 日志" Tag="Xray" Style="{StaticResource OutlineButton}" Height="36" Width="96" Padding="0" FontSize="14" Click="LogSource_Click" />
                                 </StackPanel>
-                                <Grid Grid.Row="2" Margin="0,0,0,12">
+                                <Grid Grid.Row="2" Margin="0,0,0,10">
                                     <Grid.ColumnDefinitions>
                                         <ColumnDefinition Width="*" />
-                                        <ColumnDefinition Width="126" />
-                                        <ColumnDefinition Width="124" />
+                                        <ColumnDefinition Width="118" />
+                                        <ColumnDefinition Width="112" />
                                     </Grid.ColumnDefinitions>
                                     <Grid>
                                         <TextBox x:Name="LogSearchTextBox" Height="44" FontSize="15" Padding="46,0,12,0" TextChanged="LogSearchTextBox_TextChanged" />
                                         <TextBlock Style="{StaticResource IconText}" Text="&#xE721;" Foreground="#718096" HorizontalAlignment="Left" Width="38" Margin="8,0,0,0" FontSize="18" />
                                         <TextBlock Text="搜索日志" IsHitTestVisible="False" Margin="46,0,0,0" VerticalAlignment="Center" Foreground="#9AA6B2" FontSize="15" Visibility="{Binding IsLogSearchEmpty, Converter={StaticResource BoolVisibilityConverter}}" />
                                     </Grid>
-                                    <ComboBox x:Name="LogLevelComboBox" Grid.Column="1" Height="44" Margin="10,0,0,0" FontSize="15" SelectedIndex="0" SelectionChanged="LogLevelComboBox_SelectionChanged">
+                                    <ComboBox x:Name="LogLevelComboBox" Grid.Column="1" Height="44" Margin="8,0,0,0" FontSize="15" SelectedIndex="0" SelectionChanged="LogLevelComboBox_SelectionChanged">
                                         <ComboBoxItem Content="全部" />
                                         <ComboBoxItem Content="ERROR" />
                                         <ComboBoxItem Content="WARN" />
                                         <ComboBoxItem Content="INFO" />
                                         <ComboBoxItem Content="XRAY" />
                                     </ComboBox>
-                                    <CheckBox x:Name="LogAutoScrollCheckBox" Grid.Column="2" Content="自动滚动" IsChecked="True" FontSize="15" Margin="12,0,0,0" Click="LogAutoScroll_Click" />
+                                    <CheckBox x:Name="LogAutoScrollCheckBox" Grid.Column="2" Content="自动滚动" IsChecked="True" FontSize="14" Margin="10,0,0,0" Click="LogAutoScroll_Click" />
                                 </Grid>
-                                <StackPanel Grid.Row="3" Orientation="Horizontal" HorizontalAlignment="Right">
-                                    <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RefreshLogs_Click" Content="刷新" />
-                                    <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="RunDiagnostics_Click" Content="诊断" />
-                                    <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CreateDiagnosticPackage_Click" Content="诊断包" />
-                                    <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CopyLogs_Click" Content="复制" />
-                                    <Button Style="{StaticResource OutlineButton}" Width="108" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="CopyErrorLogs_Click" Content="复制错误" />
-                                    <Button Style="{StaticResource OutlineButton}" Width="96" Height="44" Margin="0,0,10,0" Padding="0" HorizontalContentAlignment="Center" Click="ClearLogs_Click" Content="清空" />
-                                    <Button Style="{StaticResource PrimaryButton}" Width="120" Height="44" Padding="0" HorizontalContentAlignment="Center" Click="OpenLogFolder_Click" Content="打开目录" />
-                                </StackPanel>
+                                <WrapPanel Grid.Row="3" HorizontalAlignment="Left">
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="78" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="RefreshLogs_Click" Content="刷新" />
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="78" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="RunDiagnostics_Click" Content="诊断" />
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="90" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="CreateDiagnosticPackage_Click" Content="诊断包" />
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="78" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="CopyLogs_Click" Content="复制" />
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="96" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="CopyErrorLogs_Click" Content="复制错误" />
+                                    <Button Style="{StaticResource OutlineButton}" MinWidth="0" Width="78" Height="40" Margin="0,0,8,8" Padding="0" HorizontalContentAlignment="Center" Click="ClearLogs_Click" Content="清空" />
+                                    <Button Style="{StaticResource PrimaryButton}" MinWidth="0" Width="112" Height="40" Margin="0,0,0,8" Padding="0" HorizontalContentAlignment="Center" Click="OpenLogFolder_Click" Content="打开目录" />
+                                </WrapPanel>
                             </Grid>
-                            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="430">
+                            <Border Grid.Row="2" Style="{StaticResource Card}" Padding="0" MinHeight="390">
                                 <Grid>
                                     <TextBlock Text="{Binding LogLineCountText}" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,12,18,0" Foreground="{StaticResource SubtleTextBrush}" FontSize="13" FontWeight="SemiBold" Panel.ZIndex="2" />
                                     <ScrollViewer x:Name="LogsScrollViewer" VerticalScrollBarVisibility="Auto" Padding="18,42,18,18">

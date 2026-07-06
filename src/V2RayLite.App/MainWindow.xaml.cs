@@ -133,7 +133,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             _currentPage = value;
             Notify();
             NotifyNavigation();
-            BeginPageAnimation();
             if (string.Equals(value, "Logs", StringComparison.OrdinalIgnoreCase))
             {
                 RefreshLogLines();
@@ -206,7 +205,6 @@ public partial class MainWindow : Window, INotifyPropertyChanged
             if (_settingsSection == value) return;
             _settingsSection = value;
             Notify();
-            BeginSettingsSectionAnimation();
         }
     }
     public string AppVersionText => $"v{GetCurrentVersionText()}";
@@ -2050,28 +2048,6 @@ private sealed record PendingUpdateMarker(string PreviousVersion, string Install
                 EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
             });
         }), System.Windows.Threading.DispatcherPriority.Loaded);
-    }
-
-    private void BeginPageAnimation()
-    {
-        Dispatcher.BeginInvoke(new Action(() =>
-        {
-            PageHost.Opacity = 0;
-            PageHost.BeginAnimation(OpacityProperty, new DoubleAnimation(0, 1, TimeSpan.FromMilliseconds(130))
-            {
-                EasingFunction = new QuadraticEase { EasingMode = EasingMode.EaseOut }
-            });
-        }), DispatcherPriority.Loaded);
-    }
-
-    private void BeginSettingsSectionAnimation()
-    {
-        if (!string.Equals(CurrentPage, "Settings", StringComparison.OrdinalIgnoreCase))
-        {
-            return;
-        }
-
-        BeginPageAnimation();
     }
 
     private void BeginNodeDetailAnimation()
